@@ -512,5 +512,24 @@ def upload_students():
         flash('Invalid file format. Please upload a standard .csv spreadsheet file.')
         
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/clear_students', methods=['POST'])
+def clear_students():
+    conn = get_db_connection()
+    try:
+        # Deletes all records from the students table
+        conn.execute("DELETE FROM students")
+        
+        # Optional: Resets the SQLite auto-increment counter back to 1
+        conn.execute("DELETE FROM sqlite_sequence WHERE name='students'")
+        
+        conn.commit()
+        flash("💥 All student records have been permanently cleared from the system!")
+     except Exception as e:
+        flash(f"Error clearing records: {str(e)}")
+     finally:
+        conn.close()
+    return redirect(url_for('admin_dashboard'))
+    
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
