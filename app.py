@@ -3,10 +3,14 @@ from werkzeug.security import check_password_hash
 from functools import wraps
 from flask import abort
 
+
 from flask import Flask, render_template, request, redirect, url_for, flash, abort
 import sqlite3
 import math
 import africastalking  # 1. Import the SMS module smoothly
+import csv
+import sqlite3
+from io import TextIOWrapper
 
 app = Flask(__name__)
 
@@ -434,6 +438,61 @@ def principal_dashboard():
                            live_stock_reams=live_stock_reams,
                            leftover_sheets=leftover_sheets,
                            recent_logs=recent_logs)
+
+@app.route('/admin/upload_students', methods=['POST'])
+def upload_students():
+    if 'csv_file' not in request.files:
+        flash('No file selected!')
+        return redirect(url_for('admin_dashboard'))
+        
+    file = request.files['csv_file']
+    if file.filename == '':
+        flash('No file selected!')
+        return redirect(url_for('admin_dashboard'))
+        
+    if file and file.filename.endswith('.csv'):
+        csv_file = TextIOWrapper(file.stream, encoding='utf-8')
+        reader = csv.DictReader(csv_file)
+        
+        conn = get_db_connection()
+        success_count = 0
+        duplicate_count = 0
+        
+        try:
+            for row in reader:
+                # Extract details matching your exact database columns
+                adm_no = row.get('adm_no')
+                name = row.get('name')
+                grade = row.get('grade')
+                stream = row.get('stream')
+                gender = row.get('gender')
+                
+                # Ensure core fields are not empty before inserting
+                if adm_no and name and grade and stream and gender:
+                    try:
+                        conn.execute(
+                            """
+                            INSERT INTO students (adm_no, name, grade, stream, gender) 
+                            VALUES (?, ?, ?, ?, ?)
+                            """,
+                            (adm_no.strip(), name.strip(), grade.strip(), stream.strip(), gender.strip())
+                        )
+                        success_count += 1
+                    except sqlite3.IntegrityError:
+                        # If the Admission Number already exists, skip it safely
+                        duplicate_count += 1
+                        
+            conn.commit()
+            flash(f"Successfully imported {success_count} students! ({duplicate_count} skipped as duplicates)")
+            
+        except Exception as e:
+            flash(f"Error processing spreadsheet: {str(e)}")
+        finally:
+            conn.close()
+    else:
+        flash('Invalid file format. Please upload a standard .csv spreadsheet file.')
+        
+    return redirect(url_for('admin_dashboard'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
