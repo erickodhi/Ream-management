@@ -124,7 +124,7 @@ def login():
         
         conn = get_db_connection()
         
-        # FORCE TABLE CREATION RIGHT HERE BEFORE SELECT RUNS
+        # We keep this block so your database table structure is always guaranteed to exist
         conn.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,18 +135,9 @@ def login():
         ''')
         conn.commit()
         
-        # --- TEMPORARY LIVE SEED: Injects your admin account if missing ---
-        from werkzeug.security import generate_password_hash
-        admin_exists = conn.execute('SELECT 1 FROM users WHERE username = ?', ('erick_admin',)).fetchone()
-        if not admin_exists:
-            conn.execute(
-                "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
-                ('erick_admin', generate_password_hash('admin123'), 'Admin')
-            )
-            conn.commit()
-        # -----------------------------------------------------------------
+        # --- THE SEED BLOCK HAS BEEN REMOVED FROM HERE ---
 
-        # Now this line will never fail because the table is guaranteed to exist!
+        # Query the user directly from the database
         user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
         conn.close()
         
@@ -371,6 +362,34 @@ def allocate_exam_reams():
         print(f"SMS Broadcast failed to dispatch: {e}")
         
     return redirect('/exam')
+@app.route('/admin/create_user', methods=['POST'])
+def create_user():
+    username = request.form.get('username')
+    plain_password = request.form.get('password')
+    role = request.form.get('role') # Taker, Exam, Principal, Admin
+    
+    if not username or not plain_password or not role:
+        flash("All fields are required!")
+        return redirect(url_for('admin_dashboard'))
+        
+    conn = get_db_connection()
+    try:
+        # Securely hash the password before saving it
+        from werkzeug.security import generate_password_hash
+        hashed_password = generate_password_hash(plain_password)
+        
+        conn.execute(
+            "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+            (username, hashed_password, role)
+        )
+        conn.commit()
+        flash(f"User '{username}' successfully created as {role}!")
+    except sqlite3.IntegrityError:
+        flash("Error: That username is already taken.")
+    finally:
+        conn.close()
+        
+    return redirect(url_for('admin_dashboard'))
 
 # ------------------ PRINCIPAL AUDIT OVERVIEW ROUTE ------------------
 @app.route('/principal')
