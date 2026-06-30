@@ -124,7 +124,7 @@ def login():
         
         conn = get_db_connection()
         
-        # We keep this block so your database table structure is always guaranteed to exist
+        # 1. Guarantee the user table exists
         conn.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -135,9 +135,17 @@ def login():
         ''')
         conn.commit()
         
-        # --- THE SEED BLOCK HAS BEEN REMOVED FROM HERE ---
+        # 2. EMERGENCY DOOR: If there are ZERO admins in the system, automatically create yours
+        from werkzeug.security import generate_password_hash
+        admin_count = conn.execute("SELECT COUNT(*) FROM users WHERE role = 'Admin'").fetchone()[0]
+        if admin_count == 0:
+            conn.execute(
+                "INSERT OR IGNORE INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+                ('erick_admin', generate_password_hash('admin123'), 'Admin')
+            )
+            conn.commit()
 
-        # Query the user directly from the database
+        # 3. Proceed with standard verification
         user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
         conn.close()
         
