@@ -454,20 +454,24 @@ def upload_students():
         csv_file = TextIOWrapper(file.stream, encoding='utf-8')
         reader = csv.DictReader(csv_file)
         
+        # Clean up any weird spaces or casing from Excel headers
+        if reader.fieldnames:
+            reader.fieldnames = [field.strip().lower() for field in reader.fieldnames]
+        
         conn = get_db_connection()
         success_count = 0
         duplicate_count = 0
+        skipped_count = 0
         
         try:
             for row in reader:
-                # Extract details matching your exact database columns
+                # Strip spaces from values to prevent empty string mismatches
                 adm_no = row.get('adm_no')
                 name = row.get('name')
                 grade = row.get('grade')
                 stream = row.get('stream')
                 gender = row.get('gender')
                 
-                # Ensure core fields are not empty before inserting
                 if adm_no and name and grade and stream and gender:
                     try:
                         conn.execute(
@@ -475,15 +479,19 @@ def upload_students():
                             INSERT INTO students (adm_no, name, grade, stream, gender) 
                             VALUES (?, ?, ?, ?, ?)
                             """,
-                            (adm_no.strip(), name.strip(), grade.strip(), stream.strip(), gender.strip())
+                            (str(adm_no).strip(), str(name).strip(), str(grade).strip(), str(stream).strip(), str(gender).strip())
                         )
                         success_count += 1
                     except sqlite3.IntegrityError:
-                        # If the Admission Number already exists, skip it safely
                         duplicate_count += 1
+                else:
+                    # Keeps track of lines missing data or mismatched headers
+                    skipped_count += 1
                         
             conn.commit()
-            flash(f"Successfully imported {success_count} students! ({duplicate_count} skipped as duplicates)")
+            
+            # This descriptive flash message will tell us EXACTLY what happened on your screen
+            flash(f"Upload Complete! Successfully Imported: {success_count} | Skipped (Empty/Header Mismatch): {skipped_count} | Skipped (Already Exists): {duplicate_count}")
             
         except Exception as e:
             flash(f"Error processing spreadsheet: {str(e)}")
@@ -493,6 +501,5 @@ def upload_students():
         flash('Invalid file format. Please upload a standard .csv spreadsheet file.')
         
     return redirect(url_for('admin_dashboard'))
-
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
