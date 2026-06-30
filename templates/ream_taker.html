@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ream Taker Collection Desk</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <!-- Secure Logout Button via Jinja Link -->
+    <a href="{{ url_for('logout') }}" style="display: inline-block; background-color: #e53e3e; color: white; padding: 8px 16px; font-weight: 600; border-radius: 4px; text-decoration: none; font-size: 14px; transition: background 0.2s;" onmouseover="this.style.backgroundColor='#c53030'" onmouseout="this.style.backgroundColor='#e53e3e'">
+    Log Out
+    </a>
 </head>
 <body class="bg-gray-100 min-h-screen pb-12">
     <nav class="bg-indigo-700 shadow-md text-white mb-6">
