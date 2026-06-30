@@ -451,12 +451,17 @@ def upload_students():
         return redirect(url_for('admin_dashboard'))
         
     if file and file.filename.endswith('.csv'):
-        csv_file = TextIOWrapper(file.stream, encoding='utf-8')
+        csv_file = TextIOWrapper(file.stream, encoding='utf-8-sig') # 'utf-8-sig' strips hidden Excel BOM characters
         reader = csv.DictReader(csv_file)
         
-        # Clean up any weird spaces or casing from Excel headers
+        # Normalize headers: lowercase, strip spaces, remove dots/hyphens
         if reader.fieldnames:
-            reader.fieldnames = [field.strip().lower() for field in reader.fieldnames]
+            print("--- DEBUG: YOUR EXCEL HEADERS ARE ---", reader.fieldnames) # Sent straight to Render logs
+            cleaned_fields = []
+            for field in reader.fieldnames:
+                clean = field.strip().lower().replace('.', '').replace(' ', '_').replace('-', '_')
+                cleaned_fields.append(clean)
+            reader.fieldnames = cleaned_fields
         
         conn = get_db_connection()
         success_count = 0
@@ -465,12 +470,12 @@ def upload_students():
         
         try:
             for row in reader:
-                # Strip spaces from values to prevent empty string mismatches
-                adm_no = row.get('adm_no')
-                name = row.get('name')
-                grade = row.get('grade')
+                # Flexible matching: checks common variations for admission number
+                adm_no = row.get('adm_no') or row.get('adm') or row.get('admission_no') or row.get('admission_number')
+                name = row.get('name') or row.get('student_name') or row.get('full_name')
+                grade = row.get('grade') or row.get('class') or row.get('form')
                 stream = row.get('stream')
-                gender = row.get('gender')
+                gender = row.get('gender') or row.get('sex')
                 
                 if adm_no and name and grade and stream and gender:
                     try:
@@ -485,13 +490,10 @@ def upload_students():
                     except sqlite3.IntegrityError:
                         duplicate_count += 1
                 else:
-                    # Keeps track of lines missing data or mismatched headers
                     skipped_count += 1
                         
             conn.commit()
-            
-            # This descriptive flash message will tell us EXACTLY what happened on your screen
-            flash(f"Upload Complete! Successfully Imported: {success_count} | Skipped (Empty/Header Mismatch): {skipped_count} | Skipped (Already Exists): {duplicate_count}")
+            flash(f"Upload Complete! Successfully Imported: {success_count} | Skipped (Header/Data Mismatch): {skipped_count} | Skipped (Already Exists): {duplicate_count}")
             
         except Exception as e:
             flash(f"Error processing spreadsheet: {str(e)}")
@@ -500,6 +502,7 @@ def upload_students():
     else:
         flash('Invalid file format. Please upload a standard .csv spreadsheet file.')
         
+    return redirect(url_for('admin_dashboard'))
     return redirect(url_for('admin_dashboard'))
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
