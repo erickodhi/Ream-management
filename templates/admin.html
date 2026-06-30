@@ -18,6 +18,15 @@
     <span>Welcome, {{ current_user.username }}</span>
     <a href="{{ url_for('logout') }}" style="color: #dc3545; text-decoration: none; font-weight: bold;">Log Out</a>
  </nav>
+ {% with messages = get_flashed_messages() %}
+  {% if messages %}
+    <div style="margin: 20px 0; padding: 15px; background-color: #ebf8ff; border-left: 4px solid #3182ce; color: #2b6cb0; border-radius: 4px; font-weight: 600; font-size: 15px;">
+      {% for message in messages %}
+        <p style="margin: 0;">📢 {{ message }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}
   <div style="max-width: 600px; background: #fff; padding: 25px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); margin-top: 20px;">
     <h3 style="margin-bottom: 15px; color: #2d3748;">Bulk Upload Students via CSV Spreadsheet</h3>
     <p style="color: #718096; font-size: 14px; margin-bottom: 15px;">
