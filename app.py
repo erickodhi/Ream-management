@@ -451,17 +451,27 @@ def upload_students():
         return redirect(url_for('admin_dashboard'))
         
     if file and file.filename.endswith('.csv'):
-        csv_file = TextIOWrapper(file.stream, encoding='utf-8-sig') # 'utf-8-sig' strips hidden Excel BOM characters
-        reader = csv.DictReader(csv_file)
+        # 1. Read raw content to inspect the delimiter Excel used
+        content = file.read().decode('utf-8-sig')
+        if not content.strip():
+            flash('The uploaded file is empty.')
+            return redirect(url_for('admin_dashboard'))
+
+        # 2. Automatically detect if Excel used a comma, semicolon, or tab
+        chosen_delimiter = ','
+        first_line = content.split('\n')[0]
+        if ';' in first_line:
+            chosen_delimiter = ';'
+        elif '\t' in first_line:
+            chosen_delimiter = '\t'
+
+        # 3. Parse the data with the correct delimiter
+        lines = content.splitlines()
+        reader = csv.DictReader(lines, delimiter=chosen_delimiter)
         
-        # Normalize headers: lowercase, strip spaces, remove dots/hyphens
+        # Normalize headers
         if reader.fieldnames:
-            print("--- DEBUG: YOUR EXCEL HEADERS ARE ---", reader.fieldnames) # Sent straight to Render logs
-            cleaned_fields = []
-            for field in reader.fieldnames:
-                clean = field.strip().lower().replace('.', '').replace(' ', '_').replace('-', '_')
-                cleaned_fields.append(clean)
-            reader.fieldnames = cleaned_fields
+            reader.fieldnames = [field.strip().lower().replace('.', '').replace(' ', '_').replace('-', '_') for field in reader.fieldnames]
         
         conn = get_db_connection()
         success_count = 0
@@ -470,7 +480,6 @@ def upload_students():
         
         try:
             for row in reader:
-                # Flexible matching: checks common variations for admission number
                 adm_no = row.get('adm_no') or row.get('adm') or row.get('admission_no') or row.get('admission_number')
                 name = row.get('name') or row.get('student_name') or row.get('full_name')
                 grade = row.get('grade') or row.get('class') or row.get('form')
@@ -502,7 +511,6 @@ def upload_students():
     else:
         flash('Invalid file format. Please upload a standard .csv spreadsheet file.')
         
-    return redirect(url_for('admin_dashboard'))
     return redirect(url_for('admin_dashboard'))
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
