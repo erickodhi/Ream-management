@@ -525,9 +525,9 @@ def clear_students():
         
         conn.commit()
         flash("💥 All student records have been permanently cleared from the system!")
-     except Exception as e:
+    except Exception as e:
         flash(f"Error clearing records: {str(e)}")
-     finally:
+    finally:
         conn.close()
     return redirect(url_for('admin_dashboard'))
     
