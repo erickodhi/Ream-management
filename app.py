@@ -45,8 +45,19 @@ def role_required(allowed_roles):
     return decorator
 
 def get_db_connection():
-    conn = sqlite3.connect('ream_yearly_v1.db')
+    conn = sqlite3.connect('ream_management.db')
     conn.row_factory = sqlite3.Row
+    
+    # Auto-create the users table if it's missing on the server
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL
+        )
+    ''')
+    conn.commit()
     return conn
 
 def init_db():
@@ -112,6 +123,18 @@ def login():
         password = request.form['password']
         
         conn = get_db_connection()
+        
+        # --- TEMPORARY LIVE SEED: Injects your admin account if missing ---
+        from werkzeug.security import generate_password_hash
+        admin_exists = conn.execute('SELECT 1 FROM users WHERE username = ?', ('erick_admin',)).fetchone()
+        if not admin_exists:
+            conn.execute(
+                "INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)",
+                ('erick_admin', generate_password_hash('admin123'), 'Admin')
+            )
+            conn.commit()
+        # -----------------------------------------------------------------
+
         user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
         conn.close()
         
@@ -119,7 +142,7 @@ def login():
             user_obj = User(user['id'], user['username'], user['role'])
             login_user(user_obj)
             
-            # Directing all 4 roles to their correct dashboards
+            # Sending all 4 roles to their exact dashboards
             if user['role'] == 'Admin': 
                 return redirect(url_for('admin_dashboard'))
             elif user['role'] == 'Principal': 
@@ -127,7 +150,7 @@ def login():
             elif user['role'] == 'Exam': 
                 return redirect(url_for('exam_dashboard'))
             elif user['role'] == 'Taker': 
-                return redirect(url_for('taker_dashboard'))
+                return redirect(url_for('ream_taker_dashboard')) # Matches your corrected taker name
                 
         flash('Invalid username or password!')
     return render_template('login.html')
