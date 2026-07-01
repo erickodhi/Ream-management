@@ -212,10 +212,29 @@ def generate_report():
     grade_selected = request.args.get('grade')
     stream_selected = request.args.get('stream')
     term_col = term_selected.replace(" ", "").lower()
+    
     conn = get_db_connection()
-    rows = conn.execute('''SELECT adm_no, name, grade, stream, gender, term1, term2, term3, summary_status 
-                           FROM students WHERE grade = ? ORDER BY stream, adm_no''', (grade_selected,)).fetchall()
+    
+    # Check if a specific stream was chosen
+    if grade_selected and stream_selected:
+        # Filter strictly by both Grade AND Stream
+        rows = conn.execute('''
+            SELECT adm_no, name, grade, stream, gender, term1, term2, term3, summary_status 
+            FROM students 
+            WHERE grade = ? AND stream = ? 
+            ORDER BY adm_no
+        ''', (grade_selected, stream_selected)).fetchall()
+    else:
+        # Fallback to your original query if "All Streams" or no stream is selected
+        rows = conn.execute('''
+            SELECT adm_no, name, grade, stream, gender, term1, term2, term3, summary_status 
+            FROM students 
+            WHERE grade = ? 
+            ORDER BY stream, adm_no
+        ''', (grade_selected,)).fetchall()
+        
     conn.close()
+    
     student_list = []
     for r in rows:
         student_list.append({
@@ -225,8 +244,14 @@ def generate_report():
             'term_status': r[term_col],
             'summary_status': r['summary_status']
         })
-    return jsonify({'students': student_list, 'term': term_selected, 'year': year_selected, 'grade': grade_selected, 'stream': stream_selected})
-
+        
+    return jsonify({
+        'students': student_list, 
+        'term': term_selected, 
+        'year': year_selected, 
+        'grade': grade_selected, 
+        'stream': stream_selected
+    })
 @app.route('/admin/update_config', methods=['POST'])
 def update_config():
     term = request.form['current_term']
