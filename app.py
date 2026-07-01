@@ -3,7 +3,7 @@ from werkzeug.security import check_password_hash
 from functools import wraps
 from flask import abort
 
-from flask import Flask, render_template, request, redirect, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, abort
 import sqlite3
 import math
 import africastalking  # 1. Import the SMS module smoothly
