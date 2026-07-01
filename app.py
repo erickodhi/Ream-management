@@ -32,17 +32,17 @@ def load_user(user_id):
         return User(user['id'], user['username'], user['role'])
     return None
 
-    def role_required(allowed_roles):
-    def decorator(f):
-        @wraps(f)
-        def decorated_function(*args, **kwargs):
-            if not current_user.is_authenticated:
-                return redirect(url_for('login'))
-            if current_user.role not in allowed_roles:
-                abort(403) # Blocks unauthorized users completely
-            return f(*args, **kwargs)
-        return decorated_function
-    return decorator
+def role_required(allowed_roles):
+def decorator(f):
+     @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not current_user.is_authenticated:
+             return redirect(url_for('login'))
+         if current_user.role not in allowed_roles:
+            abort(403) # Blocks unauthorized users completely
+        return f(*args, **kwargs)
+    return decorated_function
+return decorator
 
 def get_db_connection():
     conn = sqlite3.connect('ream_yearly_v1.db')
