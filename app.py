@@ -145,16 +145,11 @@ def forbidden_error(error):
 def home():
     return redirect('/admin')
 
-
-
 # ------------------ ADMIN DESK ------------------
 
 @app.route('/admin')
 @login_required
 @role_required(['Admin'])
-def admin_dashboard():
-
-@app.route('/admin')
 def admin_dashboard():
     conn = get_db_connection()
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
@@ -215,9 +210,6 @@ def add_student():
 @app.route('/taker')
 @login_required
 @role_required(['Taker', 'Admin'])
-def taker_dashboard():
-
-@app.route('/taker')
 def ream_taker_dashboard():
     conn = get_db_connection()
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
@@ -226,6 +218,8 @@ def ream_taker_dashboard():
     return render_template('ream_taker.html', config=config, students=students)
 
 @app.route('/taker/submit/<adm_no>')
+@login_required
+@role_required(['Taker', 'Admin'])
 def taker_submit(adm_no):
     conn = get_db_connection()
     config = conn.execute('SELECT current_term FROM system_config LIMIT 1').fetchone()
@@ -237,6 +231,8 @@ def taker_submit(adm_no):
     return redirect('/taker')
 
 @app.route('/taker/undo/<adm_no>')
+@login_required
+@role_required(['Taker', 'Admin'])
 def taker_undo(adm_no):
     conn = get_db_connection()
     config = conn.execute('SELECT current_term FROM system_config LIMIT 1').fetchone()
@@ -246,15 +242,11 @@ def taker_undo(adm_no):
     conn.commit()
     conn.close()
     return redirect('/taker')
-
 # ------------------ EXAMINATION DEPARTMENT DESK ------------------
 
 @app.route('/exam')
 @login_required
 @role_required(['Exam', 'Admin'])
-def exam_dashboard():
-
-@app.route('/exam')
 def exam_dashboard():
     conn = get_db_connection()
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
@@ -350,9 +342,6 @@ def allocate_exam_reams():
 @app.route('/principal')
 @login_required
 @role_required(['Principal', 'Admin'])
-def principal_dashboard():
-
-@app.route('/principal')
 def principal_dashboard():
     conn = get_db_connection()
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
