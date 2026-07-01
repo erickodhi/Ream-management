@@ -124,6 +124,17 @@ def login():
         
         conn = get_db_connection()
         
+        # FORCE TABLE CREATION RIGHT HERE BEFORE SELECT RUNS
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL
+            )
+        ''')
+        conn.commit()
+        
         # --- TEMPORARY LIVE SEED: Injects your admin account if missing ---
         from werkzeug.security import generate_password_hash
         admin_exists = conn.execute('SELECT 1 FROM users WHERE username = ?', ('erick_admin',)).fetchone()
@@ -135,6 +146,7 @@ def login():
             conn.commit()
         # -----------------------------------------------------------------
 
+        # Now this line will never fail because the table is guaranteed to exist!
         user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
         conn.close()
         
@@ -142,7 +154,6 @@ def login():
             user_obj = User(user['id'], user['username'], user['role'])
             login_user(user_obj)
             
-            # Sending all 4 roles to their exact dashboards
             if user['role'] == 'Admin': 
                 return redirect(url_for('admin_dashboard'))
             elif user['role'] == 'Principal': 
@@ -150,7 +161,7 @@ def login():
             elif user['role'] == 'Exam': 
                 return redirect(url_for('exam_dashboard'))
             elif user['role'] == 'Taker': 
-                return redirect(url_for('ream_taker_dashboard')) # Matches your corrected taker name
+                return redirect(url_for('ream_taker_dashboard'))
                 
         flash('Invalid username or password!')
     return render_template('login.html')
