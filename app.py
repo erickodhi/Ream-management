@@ -200,6 +200,7 @@ def generate_report():
     term_selected = request.args.get('term')
     year_selected = request.args.get('year')
     grade_selected = request.args.get('grade')
+    stream_selected = request.args.get('stream')
     term_col = term_selected.replace(" ", "").lower()
     conn = get_db_connection()
     rows = conn.execute('''SELECT adm_no, name, grade, stream, gender, term1, term2, term3, summary_status 
@@ -214,7 +215,7 @@ def generate_report():
             'term_status': r[term_col],
             'summary_status': r['summary_status']
         })
-    return jsonify({'students': student_list, 'term': term_selected, 'year': year_selected, 'grade': grade_selected})
+    return jsonify({'students': student_list, 'term': term_selected, 'year': year_selected, 'grade': grade_selected, 'stream': stream_selected})
 
 @app.route('/admin/update_config', methods=['POST'])
 def update_config():
