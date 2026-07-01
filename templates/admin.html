@@ -296,10 +296,12 @@
                 <div>
                     <label class="block text-xs font-bold text-gray-500 uppercase">Select Stream</label>
                     <select id="rptStream" class="mt-1 p-2 text-sm border rounded bg-white font-medium w-36">
-                        <option value="">All Streams</option>
-                        <option value="A">Stream A</option>
-                        <option value="B">Stream B</option>
-                        <option value="C">Stream C</option>
+                       <option value="">All Streams</option>
+    
+                        {% for s in distinct_streams %}
+                        <option value="{{ s.stream }}">{{ s.stream }}</option>
+                        {% endfor %}
+    
                     </select>
                 </div>
 
