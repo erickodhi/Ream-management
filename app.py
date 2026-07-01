@@ -1,9 +1,48 @@
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from werkzeug.security import check_password_hash
+from functools import wraps
+from flask import abort
+
 from flask import Flask, render_template, request, redirect, jsonify
 import sqlite3
 import math
 import africastalking  # 1. Import the SMS module smoothly
 
 app = Flask(__name__)
+
+# Enable session security
+app.secret_key = "secure_ream_key_123" 
+
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'  # Sends unlogged-in users back to login page
+
+class User(UserMixin):
+    def __init__(self, id, username, role):
+        self.id = id
+        self.username = username
+        self.role = role
+
+@login_manager.user_loader
+def load_user(user_id):
+    conn = get_db_connection()
+    user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+    conn.close()
+    if user:
+        return User(user['id'], user['username'], user['role'])
+    return None
+
+    def role_required(allowed_roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not current_user.is_authenticated:
+                return redirect(url_for('login'))
+            if current_user.role not in allowed_roles:
+                abort(403) # Blocks unauthorized users completely
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
 
 def get_db_connection():
     conn = sqlite3.connect('ream_yearly_v1.db')
@@ -66,11 +105,55 @@ def update_student_summary(conn, adm_no):
         summary = "Cleared ✅" if pending_count == 0 else f"{pending_count} Reams Owed"
         conn.execute('UPDATE students SET summary_status = ? WHERE adm_no = ?', (summary, adm_no))
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form['username']
+        password = request.form['password']
+        
+        conn = get_db_connection()
+        user = conn.execute('SELECT * FROM users WHERE username = ?', (username,)).fetchone()
+        conn.close()
+        
+        if user and check_password_hash(user['password_hash'], password):
+            user_obj = User(user['id'], user['username'], user['role'])
+            login_user(user_obj)
+            
+            # Directing all 4 roles to their correct dashboards
+            if user['role'] == 'Admin': 
+                return redirect(url_for('admin_dashboard'))
+            elif user['role'] == 'Principal': 
+                return redirect(url_for('principal_dashboard'))
+            elif user['role'] == 'Exam': 
+                return redirect(url_for('exam_dashboard'))
+            elif user['role'] == 'Taker': 
+                return redirect(url_for('taker_dashboard'))
+                
+        flash('Invalid username or password!')
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required
+def logout():
+    logout_user()
+    return redirect(url_for('login'))
+
+@app.errorhandler(403)
+def forbidden_error(error):
+    return render_template('403.html'), 403
 @app.route('/')
 def home():
     return redirect('/admin')
 
+
+
 # ------------------ ADMIN DESK ------------------
+
+@app.route('/admin')
+@login_required
+@role_required(['Admin'])
+def admin_dashboard():
+
 @app.route('/admin')
 def admin_dashboard():
     conn = get_db_connection()
@@ -128,6 +211,12 @@ def add_student():
     return redirect('/admin')
 
 # ------------------ REAM TAKER DESK ------------------
+
+@app.route('/taker')
+@login_required
+@role_required(['Taker', 'Admin'])
+def taker_dashboard():
+
 @app.route('/taker')
 def ream_taker_dashboard():
     conn = get_db_connection()
@@ -159,6 +248,12 @@ def taker_undo(adm_no):
     return redirect('/taker')
 
 # ------------------ EXAMINATION DEPARTMENT DESK ------------------
+
+@app.route('/exam')
+@login_required
+@role_required(['Exam', 'Admin'])
+def exam_dashboard():
+
 @app.route('/exam')
 def exam_dashboard():
     conn = get_db_connection()
@@ -252,6 +347,11 @@ def allocate_exam_reams():
     return redirect('/exam')
 
 # ------------------ PRINCIPAL AUDIT OVERVIEW ROUTE ------------------
+@app.route('/principal')
+@login_required
+@role_required(['Principal', 'Admin'])
+def principal_dashboard():
+
 @app.route('/principal')
 def principal_dashboard():
     conn = get_db_connection()
