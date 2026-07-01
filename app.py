@@ -33,9 +33,9 @@ def load_user(user_id):
     return None
 
 def role_required(allowed_roles):
-def decorator(f):
-     @wraps(f)
-    def decorated_function(*args, **kwargs):
+    def decorator(f):
+      @wraps(f)
+      def decorated_function(*args, **kwargs):
         if not current_user.is_authenticated:
              return redirect(url_for('login'))
          if current_user.role not in allowed_roles:
