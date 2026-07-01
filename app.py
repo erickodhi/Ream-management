@@ -192,8 +192,18 @@ def admin_dashboard():
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     students = conn.execute('SELECT * FROM students').fetchall()
     distinct_grades = conn.execute('SELECT DISTINCT grade FROM students ORDER BY grade').fetchall()
+    
+    # This fetches your unique stream list from the database
+    distinct_streams = conn.execute("SELECT DISTINCT stream FROM students WHERE stream IS NOT NULL AND stream != '' ORDER BY stream").fetchall()
+    
     conn.close()
-    return render_template('admin.html', config=config, students=students, distinct_grades=distinct_grades)
+    
+    # This sends everything to your HTML dashboard template
+    return render_template('admin.html', 
+                           config=config, 
+                           students=students, 
+                           distinct_grades=distinct_grades, 
+                           distinct_streams=distinct_streams)
 
 @app.route('/admin/report')
 def generate_report():
