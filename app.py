@@ -4,14 +4,13 @@ import sqlite3
 app = Flask(__name__)
 
 # Helper function to connect to our SQLite database
-# Helper function to connect to our SQLite database
 def get_db_connection():
-    # Changed from database.db to v2_database.db to force a clean slate on Render
+    # Using v2_database.db ensures a fresh, clean database slate on Render
     conn = sqlite3.connect('v2_database.db')
     conn.row_factory = sqlite3.Row
     return conn
 
-# Automatically set up the student database table when the program starts
+# Automatically set up the student database table structure
 def init_db():
     conn = get_db_connection()
     conn.execute('''
@@ -25,6 +24,11 @@ def init_db():
         )''')
     conn.commit()
     conn.close()
+
+# This tells Flask to build the database schema before handling ANY incoming web request
+@app.before_request
+def initialize_on_startup():
+    init_db()
 
 # Route 0: Automatically redirect the bare home URL to the Admin page
 @app.route('/')
@@ -50,10 +54,12 @@ def add_student():
     
     conn = get_db_connection()
     try:
+        # Explicitly sets the default status to 'Pending' for new registrations
         conn.execute('INSERT INTO students (adm_no, name, form, stream, gender, status) VALUES (?, ?, ?, ?, ?, ?)',
                      (adm_no, name, form, stream, gender, 'Pending'))
         conn.commit()
     except sqlite3.IntegrityError:
+        # Skips if admission number is a duplicate to prevent app failure
         pass
     conn.close()
     return redirect('/admin')
@@ -75,7 +81,7 @@ def submit_ream(adm_no):
     conn.close()
     return redirect('/taker')
 
-# Route 5: Action when clicking "Undo" -> Changes status to Pending
+# Route 5: Action when clicking "Undo" -> Changes status back to Pending
 @app.route('/taker/undo/<adm_no>')
 def undo_ream(adm_no):
     conn = get_db_connection()
@@ -85,5 +91,4 @@ def undo_ream(adm_no):
     return redirect('/taker')
 
 if __name__ == '__main__':
-    init_db()
     app.run(host='0.0.0.0', port=5000)
