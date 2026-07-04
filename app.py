@@ -29,7 +29,7 @@ def init_db():
 def home():
     return redirect('/admin')
 
-# Route 1: Displays the Admin dashboard with the registration form and student list
+# Route 1: Displays the Admin dashboard
 @app.route('/admin')
 def admin_dashboard():
     conn = get_db_connection()
@@ -48,14 +48,12 @@ def add_student():
     
     conn = get_db_connection()
     try:
-        conn.execute('INSERT INTO students (adm_no, name, form, stream, gender) VALUES (?, ?, ?, ?, ?)',
-                     (adm_no, name, form, stream, gender))
+        conn.execute('INSERT INTO students (adm_no, name, form, stream, gender, status) VALUES (?, ?, ?, ?, ?, ?)',
+                     (adm_no, name, form, stream, gender, 'Pending'))
         conn.commit()
     except sqlite3.IntegrityError:
-        # Prevents crashing if the Admission Number already exists
         pass
     conn.close()
-    
     return redirect('/admin')
 
 # Route 3: Ream Taker Dashboard (Displays all students and their statuses)
@@ -66,7 +64,7 @@ def ream_taker_dashboard():
     conn.close()
     return render_template('ream_taker.html', students=students)
 
-# Route 4: Action when the Ream Taker clicks "Submitted"
+# Route 4: Action when clicking "Submitted" -> Changes status to Submitted
 @app.route('/taker/submit/<adm_no>')
 def submit_ream(adm_no):
     conn = get_db_connection()
@@ -75,7 +73,7 @@ def submit_ream(adm_no):
     conn.close()
     return redirect('/taker')
 
-# Route 5: NEW Action when the Ream Taker clicks "Undo"
+# Route 5: Action when clicking "Undo" -> Changes status to Pending
 @app.route('/taker/undo/<adm_no>')
 def undo_ream(adm_no):
     conn = get_db_connection()
