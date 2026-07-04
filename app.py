@@ -23,6 +23,11 @@ def init_db():
     conn.commit()
     conn.close()
 
+# Route 0: Automatically redirect the bare home URL to the Admin page
+@app.route('/')
+def home():
+    return redirect('/admin')
+
 # Route 1: Displays the dashboard with the form and side-by-side table
 @app.route('/admin')
 def admin_dashboard():
