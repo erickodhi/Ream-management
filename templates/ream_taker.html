@@ -30,7 +30,7 @@
                             <th class="p-3">Stream</th>
                             <th class="p-3">Gender</th>
                             <th class="p-3">Current Status</th>
-                            <th class="p-3 text-center">Action</th>
+                            <th class="p-3 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody class="text-gray-600 divide-y divide-gray-200">
@@ -44,22 +44,31 @@
                             <td class="p-3">
                                 {% if student.status == 'Submitted' %}
                                 <span class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-                                    Submitted
+                                    Submitted ✅
                                 </span>
                                 {% else %}
                                 <span class="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-                                    Pending
+                                    Pending ⏳
                                 </span>
                                 {% endif %}
                             </td>
-                            <td class="p-3 text-center">
+                            <td class="p-3 text-center space-x-2">
                                 {% if student.status == 'Pending' %}
-                                <a href="/taker/submit/{{ student.adm_no }}" 
-                                   class="bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-4 py-2 rounded transition shadow-sm">
-                                    Mark Submitted
-                                </a>
+                                    <a href="/taker/submit/{{ student.adm_no }}" 
+                                       class="inline-block bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-4 py-2 rounded transition shadow-sm">
+                                        Submitted
+                                    </a>
+                                    <span class="inline-block bg-gray-200 text-gray-400 text-xs font-medium px-4 py-2 rounded cursor-not-allowed">
+                                        Undo
+                                    </span>
                                 {% else %}
-                                <span class="text-gray-400 text-xs italic">Clear ✅</span>
+                                    <span class="inline-block bg-gray-200 text-gray-400 text-xs font-medium px-4 py-2 rounded cursor-not-allowed">
+                                        Submitted
+                                    </span>
+                                    <a href="/taker/undo/{{ student.adm_no }}" 
+                                       class="inline-block bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-4 py-2 rounded transition shadow-sm">
+                                        Undo
+                                    </a>
                                 {% endif %}
                             </td>
                         </tr>

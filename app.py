@@ -66,11 +66,20 @@ def ream_taker_dashboard():
     conn.close()
     return render_template('ream_taker.html', students=students)
 
-# Route 4: Action when the Ream Taker clicks "Mark Submitted"
+# Route 4: Action when the Ream Taker clicks "Submitted"
 @app.route('/taker/submit/<adm_no>')
 def submit_ream(adm_no):
     conn = get_db_connection()
     conn.execute("UPDATE students SET status = 'Submitted' WHERE adm_no = ?", (adm_no,))
+    conn.commit()
+    conn.close()
+    return redirect('/taker')
+
+# Route 5: NEW Action when the Ream Taker clicks "Undo"
+@app.route('/taker/undo/<adm_no>')
+def undo_ream(adm_no):
+    conn = get_db_connection()
+    conn.execute("UPDATE students SET status = 'Pending' WHERE adm_no = ?", (adm_no,))
     conn.commit()
     conn.close()
     return redirect('/taker')
