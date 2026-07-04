@@ -53,23 +53,15 @@
                                 {% endif %}
                             </td>
                             <td class="p-3 text-center space-x-2">
-                                {% if student.status == 'Pending' %}
-                                    <a href="/taker/submit/{{ student.adm_no }}" 
-                                       class="inline-block bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-4 py-2 rounded transition shadow-sm">
-                                        Submitted
-                                    </a>
-                                    <span class="inline-block bg-gray-200 text-gray-400 text-xs font-medium px-4 py-2 rounded cursor-not-allowed">
-                                        Undo
-                                    </span>
-                                {% else %}
-                                    <span class="inline-block bg-gray-200 text-gray-400 text-xs font-medium px-4 py-2 rounded cursor-not-allowed">
-                                        Submitted
-                                    </span>
-                                    <a href="/taker/undo/{{ student.adm_no }}" 
-                                       class="inline-block bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-4 py-2 rounded transition shadow-sm">
-                                        Undo
-                                    </a>
-                                {% endif %}
+                                <a href="/taker/submit/{{ student.adm_no }}" 
+       class="inline-block bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-4 py-2 rounded transition shadow-sm">
+        Submitted
+    </a>
+    
+    <a href="/taker/undo/{{ student.adm_no }}" 
+       class="inline-block bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-4 py-2 rounded transition shadow-sm">
+        Undo
+    </a>
                             </td>
                         </tr>
                         {% else %}
