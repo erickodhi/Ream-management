@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Examination Desk - Ream Calculator</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    
+    <nav class="bg-white shadow-md mb-8">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+            <span class="font-bold text-xl text-blue-600">ReamTracker 📄</span>
+            <div class="space-x-4">
+                <a href="/admin" class="text-gray-600 hover:text-blue-600 transition font-medium">Admin Desk</a>
+                <a href="/taker" class="text-gray-600 hover:text-blue-600 transition font-medium">Ream Taker Desk</a>
+                <a href="/exam" class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-1">Exam Desk</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
+        
+        <div class="bg-white p-6 rounded-lg shadow-md h-fit lg:col-span-1">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">Paper Ream Calculator</h2>
+            <form action="/exam/allocate" method="POST" class="space-y-4">
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Exam Subject Paper Name</label>
+                    <input type="text" name="exam_name" placeholder="e.g., Mathematics Paper 1" required class="w-full mt-1 p-2 border rounded-md shadow-sm border-gray-300 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Form / Grade</label>
+                        <select id="formSelect" name="form" required class="w-full mt-1 p-2 border rounded-md bg-white shadow-sm border-gray-300 focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select...</option>
+                            {% for f in forms %}
+                            <option value="{{ f.form }}">Form {{ f.form }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">Stream</label>
+                        <select id="streamSelect" name="stream" required class="w-full mt-1 p-2 border rounded-md bg-white shadow-sm border-gray-300 focus:ring-2 focus:ring-blue-500">
+                            <option value="">Select...</option>
+                            {% for s in streams %}
+                            <option value="{{ s.stream }}">{{ s.stream }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="p-3 bg-blue-50 text-blue-800 text-xs rounded border border-blue-200 hidden" id="systemCountBox">
+                    💡 System Registry Count: <span id="systemCountValue" class="font-bold">0</span> students registered.
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Target Student Count (Customizable)</label>
+                    <input type="number" id="studentCountInput" name="student_count" required min="1" placeholder="Enter custom count or select above" class="w-full mt-1 p-2 border rounded-md shadow-sm border-gray-300 focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Number of Pages per Exam Paper</label>
+                    <input type="number" id="pagesInput" name="pages_per_paper" required min="1" placeholder="e.g., 8" class="w-full mt-1 p-2 border rounded-md shadow-sm border-gray-300 focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <div class="p-4 bg-gray-50 border border-gray-200 rounded-md text-sm space-y-2">
+                    <div class="flex justify-between text-gray-600">
+                        <span>Total Sheets Required:</span>
+                        <span id="projectedSheets" class="font-bold text-gray-800">0 sheets</span>
+                    </div>
+                    <div class="flex justify-between items-center pt-2 border-t border-gray-200">
+                        <span class="font-medium text-gray-700">Approx. Reams Needed:</span>
+                        <span id="projectedReams" class="text-lg font-extrabold text-blue-600">0 Reams</span>
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-md shadow transition focus:ring-4 focus:ring-blue-200">
+                    Approve & Issue Reams
+                </button>
+            </form>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md lg:col-span-2">
+            <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">Issued Exam Paper Ream History</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-100 text-gray-700 text-xs uppercase font-semibold">
+                            <th class="p-3">Paper / Exam Name</th>
+                            <th class="p-3">Form & Stream</th>
+                            <th class="p-3">Students Sitting</th>
+                            <th class="p-3">Pages</th>
+                            <th class="p-3 text-right">Reams Issued</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm text-gray-600 divide-y divide-gray-200">
+                        {% for item in allocations %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="p-3 font-semibold text-gray-900">{{ item.exam_name }}</td>
+                            <td class="p-3">Form {{ item.form }} - {{ item.stream }}</td>
+                            <td class="p-3">{{ item.student_count }} students</td>
+                            <td class="p-3">{{ item.pages_per_paper }} pages</td>
+                            <td class="p-3 text-right font-bold text-blue-600">{{ item.reams_allocated | int }} Reams</td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="p-6 text-center text-gray-400">No examination print records logged yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        
+    </div>
+
+    <script>
+        const formSelect = document.getElementById('formSelect');
+        const streamSelect = document.getElementById('streamSelect');
+        const systemCountBox = document.getElementById('systemCountBox');
+        const systemCountValue = document.getElementById('systemCountValue');
+        const studentCountInput = document.getElementById('studentCountInput');
+        const pagesInput = document.getElementById('pagesInput');
+        const projectedSheets = document.getElementById('projectedSheets');
+        const projectedReams = document.getElementById('projectedReams');
+
+        // Fetch registered totals dynamically from database when dropdown selection changes
+        async function checkRegistryCount() {
+            const form = formSelect.value;
+            const stream = streamSelect.value;
+            if (form && stream) {
+                const response = await fetch(`/api/get_student_count?form=${form}&stream=${stream}`);
+                const data = await response.json();
+                systemCountValue.innerText = data.total;
+                studentCountInput.value = data.total; // Default selection to matching max count
+                systemCountBox.classList.remove('hidden');
+                calculateReams();
+            } else {
+                systemCountBox.classList.add('hidden');
+            }
+        }
+
+        // Live calculation logic tracking text entry fields
+        function calculateReams() {
+            const students = parseInt(studentCountInput.value) || 0;
+            const pages = parseInt(pagesInput.value) || 0;
+            
+            const totalSheets = students * pages;
+            const totalReams = Math.ceil(totalSheets / 500);
+            
+            projectedSheets.innerText = totalSheets.toLocaleString() + " sheets";
+            projectedReams.innerText = totalReams + " Ream" + (totalReams !== 1 ? "s" : "");
+        }
+
+        formSelect.addEventListener('change', checkRegistryCount);
+        streamSelect.addEventListener('change', checkRegistryCount);
+        studentCountInput.addEventListener('input', calculateReams);
+        pagesInput.addEventListener('input', calculateReams);
+    </script>
+</body>
+</html>
