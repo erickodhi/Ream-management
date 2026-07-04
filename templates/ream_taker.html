@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ream Taker Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-800">Ream Collection Desk</h1>
+                <p class="text-gray-600">Verify student details and update ream submission status.</p>
+            </div>
+            <span class="bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-sm">
+                Role: Ream Taker
+            </span>
+        </header>
+
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4 text-gray-700">Student Submission Roster</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-gray-200 text-gray-700 text-sm uppercase">
+                            <th class="p-3">Adm No</th>
+                            <th class="p-3">Name</th>
+                            <th class="p-3">Form/Grade</th>
+                            <th class="p-3">Stream</th>
+                            <th class="p-3">Gender</th>
+                            <th class="p-3">Current Status</th>
+                            <th class="p-3 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-gray-600 divide-y divide-gray-200">
+                        {% for student in students %}
+                        <tr class="hover:bg-gray-50">
+                            <td class="p-3 font-mono font-bold text-gray-800">{{ student.adm_no }}</td>
+                            <td class="p-3 font-medium text-gray-900">{{ student.name }}</td>
+                            <td class="p-3">Form {{ student.form }}</td>
+                            <td class="p-3">{{ student.stream }}</td>
+                            <td class="p-3">{{ student.gender }}</td>
+                            <td class="p-3">
+                                {% if student.status == 'Submitted' %}
+                                <span class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-1 rounded-full">
+                                    Submitted
+                                </span>
+                                {% else %}
+                                <span class="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-full">
+                                    Pending
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td class="p-3 text-center">
+                                {% if student.status == 'Pending' %}
+                                <a href="/taker/submit/{{ student.adm_no }}" 
+                                   class="bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-4 py-2 rounded transition shadow-sm">
+                                    Mark Submitted
+                                </a>
+                                {% else %}
+                                <span class="text-gray-400 text-xs italic">Clear ✅</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="p-4 text-center text-gray-400">No students registered by the Admin yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

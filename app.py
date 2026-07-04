@@ -44,6 +44,7 @@ def add_student():
     form = request.form['form']
     stream = request.form['stream']
     gender = request.form['gender']
+    status TEXT DEFAULT 'Pending'
     
     conn = get_db_connection()
     try:
@@ -56,6 +57,23 @@ def add_student():
     conn.close()
     
     return redirect('/admin')
+
+# Route 3: Ream Taker Dashboard (Displays all students and their statuses)
+@app.route('/taker')
+def ream_taker_dashboard():
+    conn = get_db_connection()
+    students = conn.execute('SELECT * FROM students').fetchall()
+    conn.close()
+    return render_template('ream_taker.html', students=students)
+
+# Route 4: Action when the Ream Taker clicks "Submitted"
+@app.route('/taker/submit/<adm_no>')
+def submit_ream(adm_no):
+    conn = get_db_connection()
+    conn.execute("UPDATE students SET status = 'Submitted' WHERE adm_no = ?", (adm_no,))
+    conn.commit()
+    conn.close()
+    return redirect('/taker')
 
 if __name__ == '__main__':
     init_db()
