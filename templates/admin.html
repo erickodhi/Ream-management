@@ -3,186 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Student Registry</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-    
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f4f6f9;
-        }
-        .dashboard-header {
-            background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-            color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        }
-        .card {
-            border: none;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-        .form-control, .form-select {
-            border-radius: 8px;
-            padding: 10px;
-            border: 1px solid #ced4da;
-        }
-        .form-control:focus, .form-select:focus {
-            border-color: #2a5298;
-            box-shadow: 0 0 0 0.2rem rgba(42, 82, 152, 0.25);
-        }
-        .btn-primary {
-            background-color: #2a5298;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-        .btn-primary:hover {
-            background-color: #1e3c72;
-        }
-        .table-container {
-            max-height: 530px;
-            overflow-y: auto;
-        }
-        .table thead th {
-            background-color: #2a5298;
-            color: white;
-            position: sticky;
-            top: 0;
-            border: none;
-        }
-        .table tbody tr {
-            align-middle: middle;
-            transition: all 0.2s;
-        }
-        .table tbody tr:hover {
-            background-color: #f1f4f9;
-        }
-        .badge-gender {
-            padding: 5px 10px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 500;
-        }
-        .bg-male { background-color: #e3f2fd; color: #0d47a1; }
-        .bg-female { background-color: #fce4ec; color: #880e4f; }
-    </style>
+    <title>Institution Admin Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
-<body>
-
-    <div class="container-fluid px-4 py-4">
-        
-        <div class="dashboard-header d-flex justify-content-between align-items-center">
+<body class="bg-gray-100 p-8">
+    <div class="max-w-6xl mx-auto">
+        <header class="mb-8 flex justify-between items-center">
             <div>
-                <h1 class="h3 mb-1">Admin Portal</h1>
-                <p class="mb-0 text-white-50">Manage school demographics and register students</p>
+                <h1 class="text-3xl font-bold text-gray-800">Student Registry Desk</h1>
+                <p class="text-gray-600">Register new students into the institutional management system.</p>
             </div>
-            <span class="badge bg-light text-dark px-3 py-2 rounded-pill">System Admin Active</span>
-        </div>
+            <a href="/taker" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded shadow-sm text-sm font-semibold transition">
+                Switch to Ream Taker Desk →
+            </a>
+        </header>
 
-        <div class="row g-4">
-            
-            <div class="col-lg-4">
-                <div class="card h-100">
-                    <div class="card-body p-4">
-                        <h4 class="card-title mb-4 text-dark font-weight-bold">Register New Student</h4>
-                        
-                        <form action="/admin/add_student" method="POST">
-                            <div class="mb-3">
-                                <label class="form-label text-secondary fw-semibold">Admission Number</label>
-                                <input type="text" name="adm_no" class="form-control" placeholder="e.g., 4532" required>
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="form-label text-secondary fw-semibold">Full Name</label>
-                                <input type="text" name="name" class="form-control" placeholder="e.g., Jane Doe" required>
-                            </div>
-                            
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label text-secondary fw-semibold">Grade / Form</label>
-                                    <select name="form" class="form-select" required>
-                                        <option value="Form 1">Form 1</option>
-                                        <option value="Form 2">Form 2</option>
-                                        <option value="Form 3">Form 3</option>
-                                        <option value="Form 4">Form 4</option>
-                                    </select>
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label text-secondary fw-semibold">Stream</label>
-                                    <input type="text" name="stream" class="form-control" placeholder="e.g., East" required>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label class="form-label text-secondary fw-semibold">Gender</label>
-                                <select name="gender" class="form-select" required>
-                                    <option value="Male">Male</option>
-                                    <option value="Female">Female</option>
-                                </select>
-                            </div>
-                            
-                            <button type="submit" class="btn btn-primary w-100 py-2 fs-5">Add to Registry</button>
-                        </form>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div class="bg-white p-6 rounded-lg shadow-md h-fit">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">Add New Student</h2>
+                <form action="/admin/add_student" method="POST" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600">Admission Number</label>
+                        <input type="text" name="adm_no" required class="w-full mt-1 p-2 border rounded-md">
                     </div>
-                </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600">Full Name</label>
+                        <input type="text" name="name" required class="w-full mt-1 p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600">Form / Grade</label>
+                        <input type="text" name="form" required class="w-full mt-1 p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600">Stream</label>
+                        <input type="text" name="stream" required class="w-full mt-1 p-2 border rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-600">Gender</label>
+                        <select name="gender" required class="w-full mt-1 p-2 border rounded-md bg-white">
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 rounded-md transition">
+                        Add to Registry
+                    </button>
+                </form>
             </div>
 
-            <div class="col-lg-8">
-                <div class="card h-100">
-                    <div class="card-body p-4">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="card-title text-dark mb-0">Student Records Directory</h4>
-                            <small class="text-muted">Scroll to view full list</small>
-                        </div>
-                        
-                        <div class="table-container border rounded">
-                            <table class="table table-hover mb-0">
-                                <thead>
-                                    <tr>
-                                        <th class="py-3 px-3">Adm No</th>
-                                        <th class="py-3">Full Name</th>
-                                        <th class="py-3">Grade/Form</th>
-                                        <th class="py-3">Stream</th>
-                                        <th class="py-3 text-center">Gender</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for student in students %}
-                                    <tr>
-                                        <td class="fw-bold text-secondary py-3 px-3">#{{ student.adm_no }}</td>
-                                        <td class="fw-semibold py-3">{{ student.name }}</td>
-                                        <td class="py-3">{{ student.form }}</td>
-                                        <td class="py-3"><span class="text-muted">{{ student.stream }}</span></td>
-                                        <td class="py-3 text-center">
-                                            {% if student.gender == 'Male' %}
-                                                <span class="badge-gender bg-male">Male</span>
-                                            {% else %}
-                                                <span class="badge-gender bg-female">Female</span>
-                                            {% endif %}
-                                        </td>
-                                    </tr>
+            <div class="bg-white p-6 rounded-lg shadow-md md:col-span-2">
+                <h2 class="text-xl font-semibold mb-4 text-gray-700">Registered Student Roster</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-200 text-gray-700 text-sm uppercase">
+                                <th class="p-3">Adm No</th>
+                                <th class="p-3">Name</th>
+                                <th class="p-3">Form</th>
+                                <th class="p-3">Stream</th>
+                                <th class="p-3">Gender</th>
+                                <th class="p-3">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-gray-600 divide-y divide-gray-200">
+                            {% for student in students %}
+                            <tr class="hover:bg-gray-50">
+                                <td class="p-3 font-mono font-bold">{{ student.adm_no }}</td>
+                                <td class="p-3">{{ student.name }}</td>
+                                <td class="p-3">Form {{ student.form }}</td>
+                                <td class="p-3">{{ student.stream }}</td>
+                                <td class="p-3">{{ student.gender }}</td>
+                                <td class="p-3">
+                                    {% if student.status == 'Submitted' %}
+                                    <span class="text-green-600 font-semibold">Submitted</span>
                                     {% else %}
-                                    <tr>
-                                        <td colspan="5" class="text-center text-muted py-5">
-                                            No students registered yet. Use the form on the left to start adding records.
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+                                    <span class="text-amber-600 font-semibold">Pending</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="p-4 text-center text-gray-400">No students registered yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
-
         </div>
     </div>
-
 </body>
 </html>
