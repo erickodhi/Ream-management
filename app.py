@@ -299,18 +299,21 @@ def ream_taker_dashboard():
     conn = get_db_connection()
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     
-    # We read 'current_year' directly from your system_config table!
-    # We convert it to a string (.strip()) to make sure it matches SQLite format perfectly.
+    # Read the active year parameter (it could be '2025' as a string)
     active_year = "2026"
     if config and config['current_year']:
         active_year = str(config['current_year']).strip()
     
-    # Fetch ONLY students whose year matches the Admin's active year
-    students = conn.execute('SELECT * FROM students WHERE year = ?', (active_year,)).fetchall()
+    # FORCE both sides to be integers during the comparison using CAST
+    # This prevents SQLite's text vs integer mismatch bug completely!
+    students = conn.execute('''
+        SELECT * FROM students 
+        WHERE CAST(year AS INTEGER) = CAST(? AS INTEGER)
+    ''', (active_year,)).fetchall()
+    
     conn.close()
     
     return render_template('ream_taker.html', config=config, students=students)
-
 @app.route('/taker/submit/<adm_no>')
 @login_required
 @role_required(['Taker', 'Admin'])
