@@ -611,6 +611,33 @@ def clear_students():
     finally:
         conn.close()
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/debug-db')
+def debug_db():
+    try:
+        conn = get_db_connection()
+        
+        # 1. Check system_config table structure
+        config_info = conn.execute("PRAGMA table_info(system_config)").fetchall()
+        config_cols = [row[1] for row in config_info]
+        
+        # Get the actual data row in system_config
+        config_data = conn.execute("SELECT * FROM system_config LIMIT 1").fetchone()
+        config_values = dict(config_data) if config_data else {}
+        
+        # 2. Check students table structure
+        student_info = conn.execute("PRAGMA table_info(students)").fetchall()
+        student_cols = [row[1] for row in student_info]
+        
+        conn.close()
+        
+        return {
+            "system_config_columns": config_cols,
+            "system_config_live_data": config_values,
+            "students_columns": student_cols
+        }
+    except Exception as e:
+        return {"error": str(e)}
     
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
