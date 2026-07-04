@@ -292,24 +292,36 @@ def add_student():
 
 # ------------------ REAM TAKER DESK ------------------
 
+from datetime import datetime  # Make sure this is at the very top of your app.py file
+
 @app.route('/taker')
 @login_required
 @role_required(['Taker', 'Admin'])
 def ream_taker_dashboard():
     conn = get_db_connection()
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
-    students = conn.execute('SELECT * FROM students').fetchall()
+    
+    # 1. Get the current year automatically (e.g., 2026)
+    current_year = datetime.now().year
+    
+    # 2. ONLY fetch students matching the current year!
+    students = conn.execute('SELECT * FROM students WHERE year = ?', (current_year,)).fetchall()
     conn.close()
+    
     return render_template('ream_taker.html', config=config, students=students)
 
 @app.route('/taker/submit/<adm_no>')
 @login_required
 @role_required(['Taker', 'Admin'])
 def taker_submit(adm_no):
+    current_year = datetime.now().year # Get current year
     conn = get_db_connection()
     config = conn.execute('SELECT current_term FROM system_config LIMIT 1').fetchone()
     current_term = config['current_term'].replace(" ", "").lower()
-    conn.execute(f"UPDATE students SET {current_term} = 'Submitted' WHERE adm_no = ?", (adm_no,))
+    
+    # We added 'AND year = ?' to make sure we only update this year's record
+    conn.execute(f"UPDATE students SET {current_term} = 'Submitted' WHERE adm_no = ? AND year = ?", (adm_no, current_year))
+    
     update_student_summary(conn, adm_no)
     conn.commit()
     conn.close()
@@ -319,10 +331,14 @@ def taker_submit(adm_no):
 @login_required
 @role_required(['Taker', 'Admin'])
 def taker_undo(adm_no):
+    current_year = datetime.now().year # Get current year
     conn = get_db_connection()
     config = conn.execute('SELECT current_term FROM system_config LIMIT 1').fetchone()
     current_term = config['current_term'].replace(" ", "").lower()
-    conn.execute(f"UPDATE students SET {current_term} = 'Pending' WHERE adm_no = ?", (adm_no,))
+    
+    # We added 'AND year = ?' here too!
+    conn.execute(f"UPDATE students SET {current_term} = 'Pending' WHERE adm_no = ? AND year = ?", (adm_no, current_year))
+    
     update_student_summary(conn, adm_no)
     conn.commit()
     conn.close()
