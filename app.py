@@ -29,7 +29,7 @@ def init_db():
 def home():
     return redirect('/admin')
 
-# Route 1: Displays the dashboard with the form and side-by-side table
+# Route 1: Displays the Admin dashboard with the registration form and student list
 @app.route('/admin')
 def admin_dashboard():
     conn = get_db_connection()
@@ -37,7 +37,7 @@ def admin_dashboard():
     conn.close()
     return render_template('admin.html', students=students)
 
-# Route 2: Receives data when the "Add to Registry" button is clicked
+# Route 2: Receives data when the Admin clicks the "Add to Registry" button
 @app.route('/admin/add_student', methods=['POST'])
 def add_student():
     adm_no = request.form['adm_no']
@@ -45,7 +45,6 @@ def add_student():
     form = request.form['form']
     stream = request.form['stream']
     gender = request.form['gender']
-    status TEXT DEFAULT 'Pending'
     
     conn = get_db_connection()
     try:
@@ -67,7 +66,7 @@ def ream_taker_dashboard():
     conn.close()
     return render_template('ream_taker.html', students=students)
 
-# Route 4: Action when the Ream Taker clicks "Submitted"
+# Route 4: Action when the Ream Taker clicks "Mark Submitted"
 @app.route('/taker/submit/<adm_no>')
 def submit_ream(adm_no):
     conn = get_db_connection()
