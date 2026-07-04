@@ -18,7 +18,8 @@ def init_db():
             name TEXT NOT NULL,
             form TEXT NOT NULL,
             stream TEXT NOT NULL,
-            gender TEXT NOT NULL
+            gender TEXT NOT NULL,
+            status TEXT DEFAULT 'Pending'
         )''')
     conn.commit()
     conn.close()
