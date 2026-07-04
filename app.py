@@ -62,6 +62,18 @@ def get_db_connection():
         )
     ''')
     conn.commit()
+
+    # --- NEW: Automatically add the missing 'year' column safely ---
+    try:
+        conn.execute("ALTER TABLE students ADD COLUMN year INTEGER DEFAULT 2026")
+        conn.commit()
+        print("Successfully added 'year' column to students table!")
+    except sqlite3.OperationalError:
+        # If the column already exists, SQLite throws an error. 
+        # We catch it here and do nothing (pass) so the app keeps running.
+        pass
+    # -----------------------------------------------------------------
+
     return conn
 
 def init_db():
@@ -217,21 +229,21 @@ def generate_report():
     
     # Check if a specific stream was chosen
     if grade_selected and stream_selected:
-        # Filter strictly by both Grade AND Stream
+        # Filter strictly by Grade, Stream, AND Year
         rows = conn.execute('''
             SELECT adm_no, name, grade, stream, gender, term1, term2, term3, summary_status 
             FROM students 
-            WHERE grade = ? AND stream = ? 
+            WHERE grade = ? AND stream = ? AND year = ?
             ORDER BY adm_no
-        ''', (grade_selected, stream_selected)).fetchall()
+        ''', (grade_selected, stream_selected, year_selected)).fetchall()
     else:
-        # Fallback to your original query if "All Streams" or no stream is selected
+        # Filter strictly by Grade AND Year (when "All Streams" is selected)
         rows = conn.execute('''
             SELECT adm_no, name, grade, stream, gender, term1, term2, term3, summary_status 
             FROM students 
-            WHERE grade = ? 
+            WHERE grade = ? AND year = ?
             ORDER BY stream, adm_no
-        ''', (grade_selected,)).fetchall()
+        ''', (grade_selected, year_selected)).fetchall()
         
     conn.close()
     
