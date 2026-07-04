@@ -297,26 +297,20 @@ def add_student():
 @role_required(['Taker', 'Admin'])
 def ream_taker_dashboard():
     conn = get_db_connection()
-    
-    # 1. Fetch the Admin's system configuration from the database
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     
-    # 2. Extract the year parameter set by the Admin.
-    # We look inside the config row for your year column (e.g., 'current_year' or 'year').
-    # If the column doesn't exist, it safely defaults to 2026 so the app doesn't crash.
-    active_year = 2026
-    if config:
-        # Check what the actual column name is in your system_config table
-        if 'current_year' in config.keys():
-            active_year = config['current_year']
-        elif 'year' in config.keys():
-            active_year = config['year']
-            
-    # 3. ONLY fetch students matching the Admin's selected year!
+    # We read 'current_year' directly from your system_config table!
+    # We convert it to a string (.strip()) to make sure it matches SQLite format perfectly.
+    active_year = "2026"
+    if config and config['current_year']:
+        active_year = str(config['current_year']).strip()
+    
+    # Fetch ONLY students whose year matches the Admin's active year
     students = conn.execute('SELECT * FROM students WHERE year = ?', (active_year,)).fetchall()
     conn.close()
     
     return render_template('ream_taker.html', config=config, students=students)
+
 @app.route('/taker/submit/<adm_no>')
 @login_required
 @role_required(['Taker', 'Admin'])
@@ -325,13 +319,12 @@ def taker_submit(adm_no):
     config = conn.execute('SELECT current_term, current_year FROM system_config LIMIT 1').fetchone()
     current_term = config['current_term'].replace(" ", "").lower()
     
-    # Read the active year parameter set by the Admin
-    if config and 'current_year' in config.keys():
-        active_year = config['current_year']
-    else:
-        active_year = 2026
+    # Read and sanitize the active year string
+    active_year = "2026"
+    if config and config['current_year']:
+        active_year = str(config['current_year']).strip()
 
-    # Update only for the Admin's active year parameter
+    # Update only for the Admin's active year
     conn.execute(f"UPDATE students SET {current_term} = 'Submitted' WHERE adm_no = ? AND year = ?", (adm_no, active_year))
     
     update_student_summary(conn, adm_no)
@@ -347,13 +340,12 @@ def taker_undo(adm_no):
     config = conn.execute('SELECT current_term, current_year FROM system_config LIMIT 1').fetchone()
     current_term = config['current_term'].replace(" ", "").lower()
     
-    # Read the active year parameter set by the Admin
-    if config and 'current_year' in config.keys():
-        active_year = config['current_year']
-    else:
-        active_year = 2026
+    # Read and sanitize the active year string
+    active_year = "2026"
+    if config and config['current_year']:
+        active_year = str(config['current_year']).strip()
 
-    # Update only for the Admin's active year parameter
+    # Update only for the Admin's active year
     conn.execute(f"UPDATE students SET {current_term} = 'Pending' WHERE adm_no = ? AND year = ?", (adm_no, active_year))
     
     update_student_summary(conn, adm_no)
