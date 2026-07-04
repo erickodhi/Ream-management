@@ -4,8 +4,10 @@ import sqlite3
 app = Flask(__name__)
 
 # Helper function to connect to our SQLite database
+# Helper function to connect to our SQLite database
 def get_db_connection():
-    conn = sqlite3.connect('database.db')
+    # Changed from database.db to v2_database.db to force a clean slate on Render
+    conn = sqlite3.connect('v2_database.db')
     conn.row_factory = sqlite3.Row
     return conn
 
