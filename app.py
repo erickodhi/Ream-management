@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, jsonify
 import sqlite3
+import math
 
 app = Flask(__name__)
 
@@ -28,6 +29,24 @@ def init_db():
             term3 TEXT DEFAULT 'Pending',
             summary_status TEXT DEFAULT '3 Reams Owed'
         )''')
+    
+    # UPDATED: Comprehensive Audit Trail Table for Examination allocations
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS exam_allocations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            exam_name TEXT NOT NULL,
+            grade TEXT NOT NULL,
+            student_count INTEGER NOT NULL,
+            sheets_per_student INTEGER NOT NULL,
+            expected_sheets INTEGER NOT NULL,
+            extra_sheets INTEGER DEFAULT 60,
+            gross_sheets_needed INTEGER NOT NULL,
+            reams_allocated INTEGER NOT NULL,
+            term_context TEXT NOT NULL,
+            year_context TEXT NOT NULL,
+            date_logged TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
+        
     config_check = conn.execute('SELECT COUNT(*) as count FROM system_config').fetchone()
     if config_check['count'] == 0:
         conn.execute("INSERT INTO system_config (current_term, current_year) VALUES ('Term 1', '2026')")
@@ -58,44 +77,32 @@ def admin_dashboard():
     conn = get_db_connection()
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     students = conn.execute('SELECT * FROM students').fetchall()
-    # Get unique grades dynamically for our new report dropdown filter
     distinct_grades = conn.execute('SELECT DISTINCT grade FROM students ORDER BY grade').fetchall()
     conn.close()
     return render_template('admin.html', config=config, students=students, distinct_grades=distinct_grades)
 
-# NEW: API endpoint to filter students for the downloadable report
 @app.route('/admin/report')
 def generate_report():
-    term_selected = request.args.get('term') # e.g., "Term 1"
+    term_selected = request.args.get('term')
     year_selected = request.args.get('year')
     grade_selected = request.args.get('grade')
-    
-    # Map selection string directly to database column key name
-    term_col = term_selected.replace(" ", "").lower() # "Term 1" -> "term1"
+    term_col = term_selected.replace(" ", "").lower()
     
     conn = get_db_connection()
-    # Query data filtered by target grade
     rows = conn.execute('''SELECT adm_no, name, grade, stream, gender, term1, term2, term3, summary_status 
                            FROM students WHERE grade = ? ORDER BY stream, adm_no''', (grade_selected,)).fetchall()
     conn.close()
     
-    # Format rows into standard JSON arrays to send to browser frontend script
     student_list = []
     for r in rows:
         student_list.append({
             'adm_no': r['adm_no'],
             'name': r['name'],
             'stream': r['stream'],
-            'term_status': r[term_col], # dynamic term collection status
+            'term_status': r[term_col],
             'summary_status': r['summary_status']
         })
-        
-    return jsonify({
-        'students': student_list,
-        'term': term_selected,
-        'year': year_selected,
-        'grade': grade_selected
-    })
+    return jsonify({'students': student_list, 'term': term_selected, 'year': year_selected, 'grade': grade_selected})
 
 @app.route('/admin/update_config', methods=['POST'])
 def update_config():
@@ -153,6 +160,53 @@ def taker_undo(adm_no):
     conn.commit()
     conn.close()
     return redirect('/taker')
+
+# ------------------ EXAMINATION DEPARTMENT DESK ------------------
+@app.route('/exam')
+def exam_dashboard():
+    conn = get_db_connection()
+    config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
+    distinct_grades = conn.execute('SELECT DISTINCT grade FROM students ORDER BY grade').fetchall()
+    allocations = conn.execute('SELECT * FROM exam_allocations ORDER BY date_logged DESC').fetchall()
+    conn.close()
+    return render_template('exam.html', config=config, distinct_grades=distinct_grades, allocations=allocations)
+
+@app.route('/api/get_grade_count')
+def get_grade_count():
+    grade = request.args.get('grade')
+    conn = get_db_connection()
+    count_row = conn.execute('SELECT COUNT(*) as total FROM students WHERE grade = ?', (grade,)).fetchone()
+    conn.close()
+    return jsonify({'total': count_row['total'] if count_row else 0})
+
+@app.route('/exam/allocate', methods=['POST'])
+def allocate_exam_reams():
+    exam_name = request.form['exam_name']
+    grade = request.form['grade']
+    student_count = int(request.form['student_count'])
+    sheets_per_student = int(request.form['sheets_per_student'])
+    term_context = request.form['term_context']
+    year_context = request.form['year_context']
+    
+    # Mathematical execution matching the strict audit requirement
+    expected_sheets = student_count * sheets_per_student
+    extra_sheets = 60
+    gross_sheets_needed = expected_sheets + extra_sheets
+    reams_allocated = math.ceil(gross_sheets_needed / 500)
+    
+    conn = get_db_connection()
+    conn.execute('''
+        INSERT INTO exam_allocations (
+            exam_name, grade, student_count, sheets_per_student, 
+            expected_sheets, extra_sheets, gross_sheets_needed, 
+            reams_allocated, term_context, year_context
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+        (exam_name, grade, student_count, sheets_per_student, 
+         expected_sheets, extra_sheets, gross_sheets_needed, 
+         reams_allocated, term_context, year_context))
+    conn.commit()
+    conn.close()
+    return redirect('/exam')
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
