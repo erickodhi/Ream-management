@@ -3,70 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ream Taker Dashboard</title>
+    <title>Ream Taker Collection Desk</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
-<body class="bg-gray-100 p-8">
-    <div class="max-w-6xl mx-auto">
-        <header class="mb-8 flex justify-between items-center">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-800">Ream Collection Desk</h1>
-                <p class="text-gray-600">Verify student details and update ream submission status.</p>
+<body class="bg-gray-100 min-h-screen pb-12">
+    <nav class="bg-indigo-700 shadow-md text-white mb-6">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <span class="font-bold text-xl tracking-wide">ReamTracker Enterprise 📄</span>
+            <div class="space-x-6 text-sm font-medium">
+                <a href="/admin" class="text-indigo-200 hover:text-white transition">System Settings & Registry</a>
+                <a href="/taker" class="border-b-2 border-white pb-1 font-semibold">Ream Taker Collection Desk</a>
             </div>
-            <span class="bg-blue-600 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-sm">
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-6">
+        <div class="mb-6 flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border-r-4 border-emerald-500">
+            <div>
+                <h1 class="text-2xl font-black text-gray-800">Ream Collection Desk</h1>
+                <p class="text-sm text-gray-500">Currently processing updates explicitly for: <span class="text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded">{{ config.current_term }} (Year {{ config.current_year }})</span></p>
+            </div>
+            <span class="bg-emerald-600 text-white text-xs font-bold tracking-wider uppercase px-3 py-1.5 rounded-full shadow-sm">
                 Role: Ream Taker
             </span>
-        </header>
+        </div>
 
-        <div class="bg-white p-6 rounded-lg shadow-md">
-            <h2 class="text-xl font-semibold mb-4 text-gray-700">Student Submission Roster</h2>
+        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
+                <table class="w-full text-left text-sm border-collapse">
                     <thead>
-                        <tr class="bg-gray-200 text-gray-700 text-sm uppercase">
-                            <th class="p-3">Adm No</th>
-                            <th class="p-3">Name</th>
-                            <th class="p-3">Form/Grade</th>
-                            <th class="p-3">Stream</th>
-                            <th class="p-3">Gender</th>
-                            <th class="p-3">Current Status</th>
-                            <th class="p-3 text-center">Actions</th>
+                        <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 text-xs font-bold uppercase">
+                            <th class="p-3">Admission No</th>
+                            <th class="p-3">Student Name</th>
+                            <th class="p-3">Class/Stream</th>
+                            <th class="p-3 text-center">Active Term Status</th>
+                            <th class="p-3 text-center">Overall Ledger Status</th>
+                            <th class="p-3 text-center">Action Controls</th>
                         </tr>
                     </thead>
-                    <tbody class="text-gray-600 divide-y divide-gray-200">
+                    <tbody class="divide-y divide-gray-100 text-gray-600">
                         {% for student in students %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="p-3 font-mono font-bold text-gray-800">{{ student.adm_no }}</td>
-                            <td class="p-3 font-medium text-gray-900">{{ student.name }}</td>
-                            <td class="p-3">Form {{ student.form }}</td>
-                            <td class="p-3">{{ student.stream }}</td>
-                            <td class="p-3">{{ student.gender }}</td>
-                            <td class="p-3">
-                                {% if student.status == 'Submitted' %}
-                                <span class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-                                    Submitted ✅
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="p-3 font-mono font-bold text-gray-900">{{ student.adm_no }}</td>
+                            <td class="p-3 font-medium text-gray-800">{{ student.name }}</td>
+                            <td class="p-3">{{ student.grade }} — {{ student.stream }}</td>
+                            
+                            <td class="p-3 text-center">
+                                {% set active_status = student.term1 if config.current_term == 'Term 1' else (student.term2 if config.current_term == 'Term 2' else student.term3) %}
+                                {% if active_status == 'Submitted' %}
+                                <span class="bg-green-100 text-green-800 text-xs font-bold px-3 py-1 rounded-full">
+                                    Received ✅
                                 </span>
                                 {% else %}
-                                <span class="bg-amber-100 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-full">
-                                    Pending ⏳
+                                <span class="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full animate-pulse">
+                                    Owed ⏳
                                 </span>
                                 {% endif %}
                             </td>
+
+                            <td class="p-3 text-center">
+                                <span class="text-xs font-bold px-2.5 py-1 rounded {{ 'bg-emerald-600 text-white shadow-sm' if student.summary_status == 'Cleared ✅' else 'bg-gray-100 text-gray-700 border border-gray-200' }}">
+                                    {{ student.summary_status }}
+                                </span>
+                            </td>
+
                             <td class="p-3 text-center space-x-2">
                                 <a href="/taker/submit/{{ student.adm_no }}" 
-       class="inline-block bg-green-600 hover:bg-green-700 text-white text-xs font-medium px-4 py-2 rounded transition shadow-sm">
-        Submitted
-    </a>
-    
-    <a href="/taker/undo/{{ student.adm_no }}" 
-       class="inline-block bg-red-600 hover:bg-red-700 text-white text-xs font-medium px-4 py-2 rounded transition shadow-sm">
-        Undo
-    </a>
+                                   class="inline-block bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-1.5 rounded transition shadow-sm">
+                                    Submitted
+                                </a>
+                                <a href="/taker/undo/{{ student.adm_no }}" 
+                                   class="inline-block bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-4 py-1.5 rounded transition shadow-sm">
+                                    Undo
+                                </a>
                             </td>
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="7" class="p-4 text-center text-gray-400">No students registered by the Admin yet.</td>
+                            <td colspan="6" class="p-6 text-center text-gray-400">No student profiles initialized by system administrator yet.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
