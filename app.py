@@ -314,7 +314,8 @@ def ream_taker_dashboard():
     conn.close()
     
     # --- TEMPORARY TEST LINE (REPLACES THE RENDER_TEMPLATE LINE) ---
-    return render_template('ream_taker.html', config=config, students=students)
+    #---return render_template('ream_taker.html', config=config, students=students)---
+    return f"DEBUG: Student 1 Year: {students[0]['year'] if len(students) > 0 else 'None'} | Student 2 Year: {students[1]['year'] if len(students) > 1 else 'None'}"
 @app.route('/taker/submit/<adm_no>')
 @login_required
 @role_required(['Taker', 'Admin'])
