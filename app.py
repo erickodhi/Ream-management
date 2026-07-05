@@ -646,6 +646,136 @@ def debug_db():
         }
     except Exception as e:
         return {"error": str(e)}
+
+@app.route('/admin/promote_students', methods=['POST'])
+def promote_students():
+    conn = get_db_connection()
+    try:
+        # 1. Fetch the active year from your system configuration
+        config = conn.execute('SELECT current_year FROM system_config LIMIT 1').fetchone()
+        if not config or not config['current_year']:
+            return "Error: Please set an active year in system settings first.", 400
+        
+        active_year = int(str(config['current_year']).strip())
+        previous_year = active_year - 1
+
+        # 2. Prevent duplicate runs for safety
+        already_promoted = conn.execute(
+            'SELECT COUNT(*) FROM students WHERE CAST(year AS INTEGER) = ?', 
+            (active_year,)
+        ).fetchone()[0]
+
+        if already_promoted > 0:
+            return f"Promotion aborted: The active year ({active_year}) already has {already_promoted} student records.", 400
+
+        # 3. Copy last year's students to the current year and step up their grades
+        conn.execute('''
+            INSERT INTO students (adm_no, name, grade, stream, gender, term1, term2, term3, summary_status, year)
+            SELECT 
+                adm_no, 
+                name, 
+                CASE 
+                    WHEN TRIM(grade) = 'Form 1' THEN 'Form 2'
+                    WHEN TRIM(grade) = 'Form 2' THEN 'Form 3'
+                    WHEN TRIM(grade) = 'Form 3' THEN 'Form 4'
+                    ELSE 'Graduated'
+                END as new_grade,
+                stream, 
+                gender, 
+                'Pending' as term1, 
+                'Pending' as term2, 
+                'Pending' as term3, 
+                'Incomplete' as summary_status, 
+                ? as year
+            FROM students 
+            WHERE CAST(year AS INTEGER) = ? 
+              AND TRIM(grade) != 'Form 4'
+              AND TRIM(grade) != 'Graduated'
+        ''', (str(active_year), previous_year))
+        
+        conn.commit()
+        
+    except Exception as e:
+        conn.rollback()
+        return f"An error occurred: {str(e)}", 500
+    finally:
+        conn.close()
+        
+    return redirect('/admin')
+
+@app.route('/admin/promote_students', methods=['POST'])
+def promote_students():
+    import sqlite3
+    
+    # Use your database filename (usually 'database.db', 'school.db', or 'ream_system.db')
+    # Change 'school.db' below to match your actual database filename if different!
+    db_file = 'school.db' 
+    
+    conn = sqlite3.connect(db_file)
+    cursor = conn.cursor()
+    
+    try:
+        # 1. Fetch current active year and term from system_config
+        cursor.execute("SELECT current_year, current_term FROM system_config LIMIT 1")
+        config = cursor.fetchone()
+        
+        if not config:
+            return "Error: System configuration not found.", 400
+            
+        current_year = int(config[0]) # e.g., 2026
+        last_year = current_year - 1  # e.g., 2025
+        
+        # 2. Safety Check: If students already exist in the database for the current year, stop!
+        cursor.execute("SELECT COUNT(*) FROM students WHERE year = ?", (current_year,))
+        existing_count = cursor.fetchone()[0]
+        if existing_count > 0:
+            return f"Promotion aborted: There are already {existing_count} student records registered for the year {current_year}.", 400
+
+        # 3. Fetch all active students from last year
+        cursor.execute("SELECT adm_no, name, grade, stream, gender FROM students WHERE year = ?", (last_year,))
+        last_year_students = cursor.fetchall()
+        
+        if not last_year_students:
+            return f"No student records found in the system for the previous year ({last_year}) to promote.", 400
+
+        promoted_count = 0
+        for student in last_year_students:
+            adm_no, name, current_grade, stream, gender = student
+            
+            # 4. Grade Promotion Logic
+            # e.g., "Form 1" -> "Form 2", "Form 3" -> "Form 4"
+            # Strip spaces and convert to uppercase to make matching robust
+            grade_clean = current_grade.strip().upper() if current_grade else ""
+            
+            if "FORM 1" in grade_clean or "GRADE 1" in grade_clean or grade_clean == "1":
+                new_grade = "Form 2"
+            elif "FORM 2" in grade_clean or "GRADE 2" in grade_clean or grade_clean == "2":
+                new_grade = "Form 3"
+            elif "FORM 3" in grade_clean or "GRADE 3" in grade_clean or grade_clean == "3":
+                new_grade = "Form 4"
+            elif "FORM 4" in grade_clean or "GRADE 4" in grade_clean or grade_clean == "4":
+                # Graduated! We skip promoting Form 4s as they have finished school
+                continue
+            else:
+                # If the grade format doesn't match standard Secondary Forms, keep the current grade
+                new_grade = current_grade
+
+            # 5. Insert the promoted student record for the new active year
+            # Sets term1, term2, term3, and summary_status to default empty/pending
+            cursor.execute("""
+                INSERT INTO students (adm_no, name, grade, stream, gender, term1, term2, term3, summary_status, year)
+                VALUES (?, ?, ?, ?, ?, '', '', '', 'Pending', ?)
+            """, (adm_no, name, new_grade, stream, gender, current_year))
+            promoted_count += 1
+            
+        conn.commit()
+        return f"<h1>Success!</h1><p>Successfully promoted {promoted_count} students from {last_year} to {current_year}.</p><p><a href='/admin'>Go Back to Admin Dashboard</a></p>"
+
+    except Exception as e:
+        conn.rollback()
+        return f"An error occurred during database migration: {str(e)}", 500
+    finally:
+        conn.close()
     
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
