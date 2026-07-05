@@ -170,7 +170,7 @@ def exam_dashboard():
     distinct_grades = conn.execute('SELECT DISTINCT grade FROM students ORDER BY grade').fetchall()
     allocations = conn.execute('SELECT * FROM exam_allocations ORDER BY date_logged DESC').fetchall()
     conn.close()
-    return render_template('exam1.html', config=config, distinct_grades=distinct_grades, allocations=allocations)
+    return render_template('exam.html', config=config, distinct_grades=distinct_grades, allocations=allocations)
 
 @app.route('/api/get_grade_count')
 def get_grade_count():
