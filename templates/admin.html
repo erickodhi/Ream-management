@@ -362,8 +362,8 @@
             Upload List
          </button>
        </form>
- </div>
-  <div style="max-width: 260px; margin-top: 15px; padding: 10px; background: #fff5f5; border: 1px solid #fed7d7; border-radius: 6px;">
+    </div>
+   <div style="max-width: 260px; margin-top: 15px; padding: 10px; background: #fff5f5; border: 1px solid #fed7d7; border-radius: 6px;">
     <h5 style="margin: 0 0 6px 0; color: #9b2c2c; font-size: 13px; font-weight: 600;">Danger Zone</h5>
     
     <form action="{{ url_for('clear_students') }}" method="POST" onsubmit="return confirm('⚠️ WARNING: Are you absolutely sure you want to permanently delete ALL students from the system? This cannot be undone!');">
@@ -372,6 +372,7 @@
         </button>
     </form>
 
+    
     <script>
         async function fetchReportData() {
             const term = document.getElementById('rptTerm').value;
@@ -424,6 +425,23 @@
             // Unhide report layout block 
             document.getElementById('printableReportArea').classList.remove('hidden');
         }
+
     </script>
+    <!-- ========================================== -->
+    <!-- SAFE PROMOTION BUTTON BLOCK (OUTSIDE SCRIPT) -->
+    <!-- ========================================== -->
+    <div class="max-w-xl mx-auto my-8 p-6 bg-gray-50 border border-dashed border-gray-300 rounded-lg text-center no-print">
+        <h4 class="text-lg font-bold text-gray-800 mb-2">Academic Year Promotion</h4>
+        <p class="text-sm text-gray-600 mb-4">
+            This will automatically copy all active students from last year, update their grades (e.g., Form 3 to Form 4), and register them for the current active year with empty/pending ream statuses.
+        </p>
+        <form action="/admin/promote_students" method="POST" onsubmit="return confirm('Are you sure you want to promote last year\'s students to the active year? This action should only be run once.');">
+            <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded shadow cursor-pointer transition">
+                Promote Students
+            </button>
+        </form>
+    </div>
+    <!-- ========================================== -->
+    
 </body>
 </html>
