@@ -649,62 +649,6 @@ def debug_db():
 
 @app.route('/admin/promote_students', methods=['POST'])
 def promote_students():
-    conn = get_db_connection()
-    try:
-        # 1. Fetch the active year from your system configuration
-        config = conn.execute('SELECT current_year FROM system_config LIMIT 1').fetchone()
-        if not config or not config['current_year']:
-            return "Error: Please set an active year in system settings first.", 400
-        
-        active_year = int(str(config['current_year']).strip())
-        previous_year = active_year - 1
-
-        # 2. Prevent duplicate runs for safety
-        already_promoted = conn.execute(
-            'SELECT COUNT(*) FROM students WHERE CAST(year AS INTEGER) = ?', 
-            (active_year,)
-        ).fetchone()[0]
-
-        if already_promoted > 0:
-            return f"Promotion aborted: The active year ({active_year}) already has {already_promoted} student records.", 400
-
-        # 3. Copy last year's students to the current year and step up their grades
-        conn.execute('''
-            INSERT INTO students (adm_no, name, grade, stream, gender, term1, term2, term3, summary_status, year)
-            SELECT 
-                adm_no, 
-                name, 
-                CASE 
-                    WHEN TRIM(grade) = 'Form 1' THEN 'Form 2'
-                    WHEN TRIM(grade) = 'Form 2' THEN 'Form 3'
-                    WHEN TRIM(grade) = 'Form 3' THEN 'Form 4'
-                    ELSE 'Graduated'
-                END as new_grade,
-                stream, 
-                gender, 
-                'Pending' as term1, 
-                'Pending' as term2, 
-                'Pending' as term3, 
-                'Incomplete' as summary_status, 
-                ? as year
-            FROM students 
-            WHERE CAST(year AS INTEGER) = ? 
-              AND TRIM(grade) != 'Form 4'
-              AND TRIM(grade) != 'Graduated'
-        ''', (str(active_year), previous_year))
-        
-        conn.commit()
-        
-    except Exception as e:
-        conn.rollback()
-        return f"An error occurred: {str(e)}", 500
-    finally:
-        conn.close()
-        
-    return redirect('/admin')
-
-@app.route('/admin/promote_students', methods=['POST'])
-def promote_students():
     import sqlite3
     
     # Use your database filename (usually 'database.db', 'school.db', or 'ream_system.db')
