@@ -231,7 +231,7 @@ def allocate_exam_reams():
         sms = africastalking.SMS
         
         # ⚠️ CHANGE THESE TO THE ACTUAL PHONE NUMBERS (Keep the plus sign and country code)
-        recipients = ["+2547448431"] 
+        recipients = ["+254755479890"] 
         
         sms_message = (
             f"⚠️ ReamTracker Audit Update\n"
