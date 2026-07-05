@@ -5,9 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>System Administrator Registry</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <style>
+        /* CSS rules to isolate and expand only the report table section during hardware printing */
+        @media print {
+            body * { visibility: hidden; }
+            #printableReportArea, #printableReportArea * { visibility: visible; }
+            #printableReportArea { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
+        }
+    </style>
 </head>
-<body class="bg-gray-100 min-h-screen pb-12">
-    <nav class="bg-indigo-700 shadow-md text-white mb-6">
+<body class="bg-gray-100 min-h-screen pb-24">
+    <nav class="bg-indigo-700 shadow-md text-white mb-6 no-print">
         <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
             <span class="font-bold text-xl tracking-wide">ReamTracker Enterprise 📄</span>
             <div class="space-x-6 text-sm font-medium">
@@ -18,7 +27,7 @@
     </nav>
 
     <div class="max-w-7xl mx-auto px-6">
-        <div class="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-wrap justify-between items-center gap-4 border-l-4 border-indigo-600">
+        <div class="bg-white p-4 rounded-lg shadow-sm mb-6 flex flex-wrap justify-between items-center gap-4 border-l-4 border-indigo-600 no-print">
             <div>
                 <p class="text-xs uppercase text-gray-400 font-bold tracking-wider">Current Operation Parameters</p>
                 <h3 class="text-lg font-bold text-gray-800">{{ config.current_term }} — Academic Year {{ config.current_year }}</h3>
@@ -36,7 +45,7 @@
             </form>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 no-print">
             <div class="bg-white p-6 rounded-lg shadow-sm h-fit border border-gray-200">
                 <h2 class="text-base font-bold text-gray-800 border-b pb-2 mb-4">Enroll New Student</h2>
                 <form action="/admin/add_student" method="POST" class="space-y-4">
@@ -123,6 +132,119 @@
                 </div>
             </div>
         </div>
+
+        <div class="mt-8 bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h2 class="text-base font-bold text-indigo-700 border-b pb-2 mb-4 no-print flex items-center gap-2">
+                📋 Class Summary Report Filter Desk
+            </h2>
+            
+            <div class="flex flex-wrap items-end gap-4 bg-gray-50 p-4 rounded-md mb-6 no-print">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase">Select Term</label>
+                    <select id="rptTerm" class="mt-1 p-2 text-sm border rounded bg-white font-medium w-40">
+                        <option value="Term 1">Term 1</option>
+                        <option value="Term 2">Term 2</option>
+                        <option value="Term 3">Term 3</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase">Select Year</label>
+                    <input type="number" id="rptYear" value="{{ config.current_year }}" class="mt-1 p-2 text-sm border rounded bg-white text-center font-medium w-28">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase">Select Class/Grade</label>
+                    <select id="rptGrade" class="mt-1 p-2 text-sm border rounded bg-white font-medium w-48">
+                        <option value="">Choose Class...</option>
+                        {% for g in distinct_grades %}
+                        <option value="{{ g.grade }}">{{ g.grade }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <button type="button" onclick="fetchReportData()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm px-5 py-2 rounded shadow transition">
+                    Generate Report Log
+                </button>
+            </div>
+
+            <div id="printableReportArea" class="hidden border border-gray-100 p-4 rounded bg-white">
+                <div class="border-b-4 border-gray-800 pb-4 mb-6 flex justify-between items-center">
+                    <div>
+                        <h1 class="text-2xl font-black text-gray-900 tracking-wide uppercase">REAMS COLLECTION COMPLIANCE REPORT</h1>
+                        <p class="text-sm font-bold text-gray-600 mt-1">
+                            Class Parameters: <span id="lblGrade" class="text-black font-black">---</span> | 
+                            Period: <span id="lblTerm" class="text-black font-black">---</span>, <span id="lblYear" class="text-black font-black">---</span>
+                        </p>
+                    </div>
+                    <button type="button" onclick="window.print()" class="no-print bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2 rounded shadow transition">
+                        🖨️ Download PDF / Print Report
+                    </button>
+                </div>
+
+                <table class="w-full text-left text-sm border border-gray-300">
+                    <thead>
+                        <tr class="bg-gray-100 border-b border-gray-300 text-gray-800 font-bold uppercase text-xs">
+                            <th class="p-3 border-r border-gray-300">Admission No</th>
+                            <th class="p-3 border-r border-gray-300">Student Name</th>
+                            <th class="p-3 border-r border-gray-300">Stream</th>
+                            <th class="p-3 border-r border-gray-300 text-center">Selected Term Status</th>
+                            <th class="p-3 text-right">Overall Yearly Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="reportTableBody" class="divide-y divide-gray-300 text-gray-800">
+                        </tbody>
+                </table>
+                
+                <div class="mt-12 pt-6 border-t border-dashed border-gray-300 flex justify-between text-xs font-semibold text-gray-500">
+                    <p>Report Generated Dynamically via ReamTracker Management System</p>
+                    <p>Sign/Stamp: ___________________________</p>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <script>
+        async function fetchReportData() {
+            const term = document.getElementById('rptTerm').value;
+            const year = document.getElementById('rptYear').value;
+            const grade = document.getElementById('rptGrade').value;
+
+            if (!grade) {
+                alert("Please select a specific Class/Grade parameter first!");
+                return;
+            }
+
+            // Request filtered payload arrays from Flask endpoint link
+            const url = `/admin/report?term=${encodeURIComponent(term)}&year=${encodeURIComponent(year)}&grade=${encodeURIComponent(grade)}`;
+            const response = await fetch(url);
+            const data = await response.json();
+
+            // Populate header text labels inside the report preview layout
+            document.getElementById('lblGrade').innerText = data.grade;
+            document.getElementById('lblTerm').innerText = data.term;
+            document.getElementById('lblYear').innerText = data.year;
+
+            const tbody = document.getElementById('reportTableBody');
+            tbody.innerHTML = ""; // Wipe older cache iterations
+
+            if (data.students.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-gray-400 font-medium">No student data matching the query filters.</td></tr>`;
+            } else {
+                data.students.forEach(s => {
+                    const row = document.createElement('tr');
+                    row.className = "hover:bg-gray-50 transition border-b border-gray-300";
+                    row.innerHTML = `
+                        <td class="p-3 font-mono font-bold border-r border-gray-300">${s.adm_no}</td>
+                        <td class="p-3 font-medium border-r border-gray-300">${s.name}</td>
+                        <td class="p-3 border-r border-gray-300">${s.stream}</td>
+                        <td class="p-3 text-center font-bold border-r border-gray-300">${s.term_status}</td>
+                        <td class="p-3 text-right font-bold">${s.summary_status}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+            }
+
+            // Unhide report layout block 
+            document.getElementById('printableReportArea').classList.remove('hidden');
+        }
+    </script>
 </body>
 </html>
