@@ -79,22 +79,24 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100 text-gray-600">
-                        {% for item in recent_logs %}
-                        <tr class="hover:bg-gray-50 transition">
-                            <td class="p-3">
-                                <span class="font-bold text-gray-800 text-sm block">{{ item.exam_name }}</span>
-                                <span class="text-gray-400 font-mono text-[10px]">{{ item.date_logged }} | {{ item.term_context }}</span>
-                            </td>
-                            <td class="p-3 text-center font-medium">{{ item.grade }} ({{ item.student_count }} kids)</td>
-                            <td class="p-3 text-center font-mono text-gray-700">{{ item.gross_sheets_needed }}</td>
-                            <td class="p-3 text-center font-black text-amber-600 font-mono">{{ item.reams_allocated }}</td>
-                            <td class="p-3 text-right font-bold text-slate-800 font-mono bg-slate-50">{{ item.remaining_sheets }} sheets</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="p-6 text-center text-gray-400">No print runs logged in database logs.</td>
-                        </tr>
-                        {% endfor %}
+                        {% if recent_logs %}
+                            {% for item in recent_logs %}
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="p-3">
+                                    <span class="font-bold text-gray-800 text-sm block">{{ item.exam_name }}</span>
+                                    <span class="text-gray-400 font-mono text-[10px]">{{ item.date_logged }} | {{ item.term_context }}</span>
+                                </td>
+                                <td class="p-3 text-center font-medium">{{ item.grade }} ({{ item.student_count }} kids)</td>
+                                <td class="p-3 text-center font-mono text-gray-700">{{ item.gross_sheets_needed }}</td>
+                                <td class="p-3 text-center font-black text-amber-600 font-mono">{{ item.reams_allocated }}</td>
+                                <td class="p-3 text-right font-bold text-slate-800 font-mono bg-slate-50">{{ item.remaining_sheets }} sheets</td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="p-6 text-center text-gray-400">No print runs logged in database logs.</td>
+                            </tr>
+                        {% endif %}
                     </tbody>
                 </table>
             </div>
