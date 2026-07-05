@@ -314,7 +314,7 @@ def ream_taker_dashboard():
     conn.close()
     
     # --- TEMPORARY TEST LINE (REPLACES THE RENDER_TEMPLATE LINE) ---
-    return f"TEST: Server is updated! Active Year: {active_year}. Students: {len(students)}"
+    return render_template('ream_taker.html', config=config, students=students)
 @app.route('/taker/submit/<adm_no>')
 @login_required
 @role_required(['Taker', 'Admin'])
