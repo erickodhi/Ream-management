@@ -6,158 +6,172 @@
     <title>Examination Desk - Ream Calculator</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
-<body class="bg-gray-100 min-h-screen">
-    
-    <nav class="bg-white shadow-md mb-8">
-        <div class="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <span class="font-bold text-xl text-blue-600">ReamTracker 📄</span>
-            <div class="space-x-4">
-                <a href="/admin" class="text-gray-600 hover:text-blue-600 transition font-medium">Admin Desk</a>
-                <a href="/taker" class="text-gray-600 hover:text-blue-600 transition font-medium">Ream Taker Desk</a>
-                <a href="/exam" class="text-blue-600 font-semibold border-b-2 border-blue-600 pb-1">Exam Desk</a>
+<body class="bg-gray-100 min-h-screen pb-12">
+    <nav class="bg-indigo-700 shadow-md text-white mb-6">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <span class="font-bold text-xl tracking-wide">ReamTracker Enterprise 📄</span>
+            <div class="space-x-6 text-sm font-medium">
+                <a href="/admin" class="text-indigo-200 hover:text-white transition">System Settings & Registry</a>
+                <a href="/taker" class="text-indigo-200 hover:text-white transition">Ream Taker Collection Desk</a>
+                <a href="/exam" class="border-b-2 border-white pb-1 font-semibold">Exam Desk Calculator</a>
             </div>
         </div>
     </nav>
 
-    <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-3 gap-8 pb-12">
-        
-        <div class="bg-white p-6 rounded-lg shadow-md h-fit lg:col-span-1">
-            <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">Paper Ream Calculator</h2>
-            <form action="/exam/allocate" method="POST" class="space-y-4">
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Exam Subject Paper Name</label>
-                    <input type="text" name="exam_name" placeholder="e.g., Mathematics Paper 1" required class="w-full mt-1 p-2 border rounded-md shadow-sm border-gray-300 focus:ring-2 focus:ring-blue-500 focus:outline-none">
-                </div>
-                
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Form / Grade</label>
-                        <select id="formSelect" name="form" required class="w-full mt-1 p-2 border rounded-md bg-white shadow-sm border-gray-300 focus:ring-2 focus:ring-blue-500">
-                            <option value="">Select...</option>
-                            {% for f in forms %}
-                            <option value="{{ f.form }}">Form {{ f.form }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700">Stream</label>
-                        <select id="streamSelect" name="stream" required class="w-full mt-1 p-2 border rounded-md bg-white shadow-sm border-gray-300 focus:ring-2 focus:ring-blue-500">
-                            <option value="">Select...</option>
-                            {% for s in streams %}
-                            <option value="{{ s.stream }}">{{ s.stream }}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-
-                <div class="p-3 bg-blue-50 text-blue-800 text-xs rounded border border-blue-200 hidden" id="systemCountBox">
-                    💡 System Registry Count: <span id="systemCountValue" class="font-bold">0</span> students registered.
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Target Student Count (Customizable)</label>
-                    <input type="number" id="studentCountInput" name="student_count" required min="1" placeholder="Enter custom count or select above" class="w-full mt-1 p-2 border rounded-md shadow-sm border-gray-300 focus:ring-2 focus:ring-blue-500">
-                </div>
-
-                <div>
-                    <label class="block text-sm font-medium text-gray-700">Number of Pages per Exam Paper</label>
-                    <input type="number" id="pagesInput" name="pages_per_paper" required min="1" placeholder="e.g., 8" class="w-full mt-1 p-2 border rounded-md shadow-sm border-gray-300 focus:ring-2 focus:ring-blue-500">
-                </div>
-
-                <div class="p-4 bg-gray-50 border border-gray-200 rounded-md text-sm space-y-2">
-                    <div class="flex justify-between text-gray-600">
-                        <span>Total Sheets Required:</span>
-                        <span id="projectedSheets" class="font-bold text-gray-800">0 sheets</span>
-                    </div>
-                    <div class="flex justify-between items-center pt-2 border-t border-gray-200">
-                        <span class="font-medium text-gray-700">Approx. Reams Needed:</span>
-                        <span id="projectedReams" class="text-lg font-extrabold text-blue-600">0 Reams</span>
-                    </div>
-                </div>
-
-                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-md shadow transition focus:ring-4 focus:ring-blue-200">
-                    Approve & Issue Reams
-                </button>
-            </form>
+    <div class="max-w-7xl mx-auto px-6">
+        <div class="bg-white p-4 rounded-lg shadow-sm mb-6 flex justify-between items-center border-l-4 border-amber-500">
+            <div>
+                <p class="text-xs uppercase text-gray-400 font-bold tracking-wider">Active Printing Window Context</p>
+                <h3 class="text-lg font-bold text-gray-800">{{ config.current_term }} — Academic Year {{ config.current_year }}</h3>
+            </div>
+            <span class="bg-amber-500 text-white text-xs font-bold tracking-wider uppercase px-3 py-1.5 rounded shadow-sm">
+                Role: Examination Officer
+            </span>
         </div>
 
-        <div class="bg-white p-6 rounded-lg shadow-md lg:col-span-2">
-            <h2 class="text-xl font-bold mb-4 text-gray-800 border-b pb-2">Issued Exam Paper Ream History</h2>
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
-                    <thead>
-                        <tr class="bg-gray-100 text-gray-700 text-xs uppercase font-semibold">
-                            <th class="p-3">Paper / Exam Name</th>
-                            <th class="p-3">Form & Stream</th>
-                            <th class="p-3">Students Sitting</th>
-                            <th class="p-3">Pages</th>
-                            <th class="p-3 text-right">Reams Issued</th>
-                        </tr>
-                    </thead>
-                    <tbody class="text-sm text-gray-600 divide-y divide-gray-200">
-                        {% for item in allocations %}
-                        <tr class="hover:bg-gray-50">
-                            <td class="p-3 font-semibold text-gray-900">{{ item.exam_name }}</td>
-                            <td class="p-3">Form {{ item.form }} - {{ item.stream }}</td>
-                            <td class="p-3">{{ item.student_count }} students</td>
-                            <td class="p-3">{{ item.pages_per_paper }} pages</td>
-                            <td class="p-3 text-right font-bold text-blue-600">{{ item.reams_allocated | int }} Reams</td>
-                        </tr>
-                        {% else %}
-                        <tr>
-                            <td colspan="5" class="p-6 text-center text-gray-400">No examination print records logged yet.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div class="bg-white p-6 rounded-lg shadow-sm h-fit border border-gray-200">
+                <h2 class="text-base font-bold text-gray-800 border-b pb-2 mb-4">Paper Requirement Calculator</h2>
+                
+                <form action="/exam/allocate" method="POST" class="space-y-4">
+                    <input type="hidden" name="term_context" value="{{ config.current_term }}">
+                    <input type="hidden" name="year_context" value="{{ config.current_year }}">
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase">Exam Subject Paper Title</label>
+                        <input type="text" name="exam_name" required placeholder="e.g., CRE Paper 1" class="w-full mt-1 p-2 text-sm border rounded focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase">Select Target Class/Grade</label>
+                        <select id="gradeSelect" name="grade" required class="w-full mt-1 p-2 text-sm border rounded bg-white focus:ring-2 focus:ring-indigo-500">
+                            <option value="">Select Class...</option>
+                            {% for g in distinct_grades %}
+                            <option value="{{ g.grade }}">{{ g.grade }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="p-2.5 bg-indigo-50 text-indigo-800 text-xs rounded border border-indigo-200 hidden" id="registryCountInfoBox">
+                        💡 System Registry: <span id="registryCountVal" class="font-bold">0</span> students registered.
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase">Target Student Count</label>
+                        <input type="number" id="studentCountInput" name="student_count" min="1" required placeholder="Select class above or enter custom count" class="w-full mt-1 p-2 text-sm border rounded focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-500 uppercase">Number of Sheets per Student</label>
+                        <input type="number" id="sheetsInput" name="sheets_per_student" min="1" required placeholder="e.g., 4" class="w-full mt-1 p-2 text-sm border rounded focus:ring-2 focus:ring-indigo-500 outline-none">
+                    </div>
+
+                    <div class="p-4 bg-gray-50 border border-gray-200 rounded text-xs space-y-2.5">
+                        <div class="flex justify-between text-gray-500 font-medium">
+                            <span>Expected Student Sheets:</span>
+                            <span id="lblExpectedSheets" class="font-bold text-gray-800">0 sheets</span>
+                        </div>
+                        <div class="flex justify-between text-amber-700 font-semibold bg-amber-50 p-1.5 rounded border border-amber-200">
+                            <span>Standard Office Margin Padding:</span>
+                            <span>+ 60 sheets</span>
+                        </div>
+                        <div class="flex justify-between text-gray-600 font-bold pt-1">
+                            <span>Gross Printing Total:</span>
+                            <span id="lblGrossSheets" class="text-gray-900">0 sheets</span>
+                        </div>
+                        <div class="flex justify-between items-center pt-2 border-t border-gray-200">
+                            <span class="font-bold text-gray-700">Approx. Reams to Issue:</span>
+                            <span id="lblTotalReams" class="text-base font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">0 Reams</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded text-sm shadow transition">
+                        Approve & Save Audit Records
+                    </button>
+                </form>
+            </div>
+
+            <div class="bg-white p-6 rounded-lg shadow-sm lg:col-span-2 border border-gray-200">
+                <h2 class="text-base font-bold text-gray-800 border-b pb-2 mb-4">Exam Paper Allocation History Audit Ledger</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase">
+                                <th class="p-3">Paper & Class Details</th>
+                                <th class="p-3 text-center">Base Sheets</th>
+                                <th class="p-3 text-center">Buffer</th>
+                                <th class="p-3 text-center">Gross Sum</th>
+                                <th class="p-3 text-right">Reams Issued</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100 text-gray-600">
+                            {% for item in allocations %}
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="p-3">
+                                    <span class="font-bold text-gray-800 text-sm block">{{ item.exam_name }}</span>
+                                    <span class="text-gray-500 font-medium text-xs">{{ item.grade }} &bull; {{ item.student_count }} students @ {{ item.sheets_per_student }} shs</span>
+                                    <p class="text-[10px] text-gray-400 font-mono mt-0.5">{{ item.date_logged }} | {{ item.term_context }}</p>
+                                </td>
+                                <td class="p-3 text-center font-mono font-medium">{{ item.expected_sheets }}</td>
+                                <td class="p-3 text-center text-amber-700 font-mono font-bold">+{{ item.extra_sheets }}</td>
+                                <td class="p-3 text-center font-mono font-bold text-gray-900 bg-gray-50">{{ item.gross_sheets_needed }}</td>
+                                <td class="p-3 text-right font-black text-indigo-600 text-sm">{{ item.reams_allocated }} Reams</td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="p-6 text-center text-gray-400">No calculation records or audit entries tracked yet.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
-        
     </div>
 
     <script>
-        const formSelect = document.getElementById('formSelect');
-        const streamSelect = document.getElementById('streamSelect');
-        const systemCountBox = document.getElementById('systemCountBox');
-        const systemCountValue = document.getElementById('systemCountValue');
+        const gradeSelect = document.getElementById('gradeSelect');
+        const registryCountInfoBox = document.getElementById('registryCountInfoBox');
+        const registryCountVal = document.getElementById('registryCountVal');
         const studentCountInput = document.getElementById('studentCountInput');
-        const pagesInput = document.getElementById('pagesInput');
-        const projectedSheets = document.getElementById('projectedSheets');
-        const projectedReams = document.getElementById('projectedReams');
+        const sheetsInput = document.getElementById('sheetsInput');
+        
+        const lblExpectedSheets = document.getElementById('lblExpectedSheets');
+        const lblGrossSheets = document.getElementById('lblGrossSheets');
+        const lblTotalReams = document.getElementById('lblTotalReams');
 
-        // Fetch registered totals dynamically from database when dropdown selection changes
-        async function checkRegistryCount() {
-            const form = formSelect.value;
-            const stream = streamSelect.value;
-            if (form && stream) {
-                const response = await fetch(`/api/get_student_count?form=${form}&stream=${stream}`);
+        gradeSelect.addEventListener('change', async () => {
+            const grade = gradeSelect.value;
+            if (grade) {
+                const response = await fetch(`/api/get_grade_count?grade=${encodeURIComponent(grade)}`);
                 const data = await response.json();
-                systemCountValue.innerText = data.total;
-                studentCountInput.value = data.total; // Default selection to matching max count
-                systemCountBox.classList.remove('hidden');
-                calculateReams();
+                
+                registryCountVal.innerText = data.total;
+                studentCountInput.value = data.total; 
+                registryCountInfoBox.classList.remove('hidden');
+                runAutomaticMathCalculator();
             } else {
-                systemCountBox.classList.add('hidden');
+                registryCountInfoBox.classList.add('hidden');
             }
-        }
+        });
 
-        // Live calculation logic tracking text entry fields
-        function calculateReams() {
+        function runAutomaticMathCalculator() {
             const students = parseInt(studentCountInput.value) || 0;
-            const pages = parseInt(pagesInput.value) || 0;
+            const sheetsPerStudent = parseInt(sheetsInput.value) || 0;
             
-            const totalSheets = students * pages;
-            const totalReams = Math.ceil(totalSheets / 500);
+            // Core calculations matching database audit fields
+            const expectedSheets = students * sheetsPerStudent;
+            const extraSheets = 60; 
+            const grossSheets = expectedSheets > 0 ? (expectedSheets + extraSheets) : 0;
+            const totalReams = Math.ceil(grossSheets / 500);
             
-            projectedSheets.innerText = totalSheets.toLocaleString() + " sheets";
-            projectedReams.innerText = totalReams + " Ream" + (totalReams !== 1 ? "s" : "");
+            lblExpectedSheets.innerText = expectedSheets.toLocaleString() + " sheets";
+            lblGrossSheets.innerText = grossSheets.toLocaleString() + " sheets";
+            lblTotalReams.innerText = totalReams + " Ream" + (totalReams !== 1 ? "s" : "");
         }
 
-        formSelect.addEventListener('change', checkRegistryCount);
-        streamSelect.addEventListener('change', checkRegistryCount);
-        studentCountInput.addEventListener('input', calculateReams);
-        pagesInput.addEventListener('input', calculateReams);
+        studentCountInput.addEventListener('input', runAutomaticMathCalculator);
+        sheetsInput.addEventListener('input', runAutomaticMathCalculator);
     </script>
 </body>
 </html>
