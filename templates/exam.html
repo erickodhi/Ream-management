@@ -95,37 +95,52 @@
                 </form>
             </div>
 
-            <div class="bg-white p-6 rounded-lg shadow-sm lg:col-span-2 border border-gray-200">
-                <h2 class="text-base font-bold text-gray-800 border-b pb-2 mb-4">Exam Paper Allocation History Audit Ledger</h2>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-xs border-collapse">
-                        <thead>
-                            <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase">
-                                <th class="p-3">Paper & Class Details</th>
-                                <th class="p-3 text-center">Gross Sum</th>
-                                <th class="p-3 text-center">Reams Issued</th>
-                                <th class="p-3 text-right">Leftover Loose Sheets</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-100 text-gray-600">
-                            {% for item in allocations %}
-                            <tr class="hover:bg-gray-50 transition">
-                                <td class="p-3">
-                                    <span class="font-bold text-gray-800 text-sm block">{{ item.exam_name }}</span>
-                                    <span class="text-gray-500 font-medium text-xs">{{ item.grade }} &bull; {{ item.student_count }} students @ {{ item.sheets_per_student }} shs (+60 buffer)</span>
-                                    <p class="text-[10px] text-gray-400 font-mono mt-0.5">{{ item.date_logged }} | {{ item.term_context }}</p>
-                                </td>
-                                <td class="p-3 text-center font-mono font-bold text-gray-900 bg-gray-50">{{ item.gross_sheets_needed }}</td>
-                                <td class="p-3 text-center font-black text-indigo-600">{{ item.reams_allocated }} Reams</td>
-                                <td class="p-3 text-right font-mono font-bold text-slate-600 bg-slate-50">{{ item.remaining_sheets }} sheets</td>
-                            </tr>
-                            {% else %}
-                            <tr>
-                                <td colspan="4" class="p-6 text-center text-gray-400">No calculation records or audit entries tracked yet.</td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+            <div class="lg:col-span-2 space-y-4">
+                
+                <div class="bg-gradient-to-r from-slate-800 to-slate-900 text-white p-4 rounded-lg shadow-sm border border-slate-700 flex justify-between items-center">
+                    <div>
+                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Total Accumulated Leftover Sheets</h4>
+                        <p class="text-xs text-slate-400 mt-0.5">Grand total balance of all loose paper variants in printing custody.</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-2xl font-black text-emerald-400 font-mono bg-slate-950/50 px-3 py-1 rounded border border-slate-800 shadow-inner">
+                            {{ grand_total_leftover }} sheets
+                        </span>
+                    </div>
+                </div>
+
+                <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                    <h2 class="text-base font-bold text-gray-800 border-b pb-2 mb-4">Exam Paper Allocation History Audit Ledger</h2>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse">
+                            <thead>
+                                <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase">
+                                    <th class="p-3">Paper & Class Details</th>
+                                    <th class="p-3 text-center">Gross Sum</th>
+                                    <th class="p-3 text-center">Reams Issued</th>
+                                    <th class="p-3 text-right">Leftover Loose Sheets</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-gray-100 text-gray-600">
+                                {% for item in allocations %}
+                                <tr class="hover:bg-gray-50 transition">
+                                    <td class="p-3">
+                                        <span class="font-bold text-gray-800 text-sm block">{{ item.exam_name }}</span>
+                                        <span class="text-gray-500 font-medium text-xs">{{ item.grade }} &bull; {{ item.student_count }} students @ {{ item.sheets_per_student }} shs (+60 buffer)</span>
+                                        <p class="text-[10px] text-gray-400 font-mono mt-0.5">{{ item.date_logged }} | {{ item.term_context }}</p>
+                                    </td>
+                                    <td class="p-3 text-center font-mono font-bold text-gray-900 bg-gray-50">{{ item.gross_sheets_needed }}</td>
+                                    <td class="p-3 text-center font-black text-indigo-600">{{ item.reams_allocated }} Reams</td>
+                                    <td class="p-3 text-right font-mono font-bold text-slate-600 bg-slate-50">{{ item.remaining_sheets }} sheets</td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="4" class="p-6 text-center text-gray-400">No calculation records or audit entries tracked yet.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
         </div>
@@ -167,7 +182,6 @@
             const grossSheets = expectedSheets > 0 ? (expectedSheets + extraSheets) : 0;
             const totalReams = Math.ceil(grossSheets / 500);
             
-            // Remnant Math
             const totalSheetsProvided = totalReams * 500;
             const remainingSheets = totalSheetsProvided - grossSheets;
             

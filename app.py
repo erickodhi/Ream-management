@@ -29,8 +29,6 @@ def init_db():
             term3 TEXT DEFAULT 'Pending',
             summary_status TEXT DEFAULT '3 Reams Owed'
         )''')
-    
-    # UPDATED: Added remaining_sheets column for explicit paper audit tracking
     conn.execute('''
         CREATE TABLE IF NOT EXISTS exam_allocations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -47,7 +45,6 @@ def init_db():
             year_context TEXT NOT NULL,
             date_logged TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )''')
-        
     config_check = conn.execute('SELECT COUNT(*) as count FROM system_config').fetchone()
     if config_check['count'] == 0:
         conn.execute("INSERT INTO system_config (current_term, current_year) VALUES ('Term 1', '2026')")
@@ -88,12 +85,10 @@ def generate_report():
     year_selected = request.args.get('year')
     grade_selected = request.args.get('grade')
     term_col = term_selected.replace(" ", "").lower()
-    
     conn = get_db_connection()
     rows = conn.execute('''SELECT adm_no, name, grade, stream, gender, term1, term2, term3, summary_status 
                            FROM students WHERE grade = ? ORDER BY stream, adm_no''', (grade_selected,)).fetchall()
     conn.close()
-    
     student_list = []
     for r in rows:
         student_list.append({
@@ -117,10 +112,10 @@ def update_config():
 
 @app.route('/admin/add_student', methods=['POST'])
 def add_student():
-    adm_no = request.form['adm_no']
-    name = request.form['name']
-    grade = request.form['grade']
-    stream = request.form['stream']
+    adm_no = request.form['adm_no'].strip()
+    name = request.form['name'].strip()
+    grade = request.form['grade'].strip()
+    stream = request.form['stream'].strip()
     gender = request.form['gender']
     conn = get_db_connection()
     try:
@@ -169,8 +164,13 @@ def exam_dashboard():
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     distinct_grades = conn.execute('SELECT DISTINCT grade FROM students ORDER BY grade').fetchall()
     allocations = conn.execute('SELECT * FROM exam_allocations ORDER BY date_logged DESC').fetchall()
+    
+    # NEW MATH: Compute the grandfather total of all remaining sheets dynamically from the database
+    total_remnants_row = conn.execute('SELECT SUM(remaining_sheets) as total_rem FROM exam_allocations').fetchone()
+    grand_total_leftover = total_remnants_row['total_rem'] if total_remnants_row['total_rem'] is not None else 0
+    
     conn.close()
-    return render_template('exam.html', config=config, distinct_grades=distinct_grades, allocations=allocations)
+    return render_template('exam.html', config=config, distinct_grades=distinct_grades, allocations=allocations, grand_total_leftover=grand_total_leftover)
 
 @app.route('/api/get_grade_count')
 def get_grade_count():
@@ -194,7 +194,6 @@ def allocate_exam_reams():
     gross_sheets_needed = expected_sheets + extra_sheets
     reams_allocated = math.ceil(gross_sheets_needed / 500)
     
-    # NEW MATH: Calculate the leftover loose paper sheets remaining from the opened reams
     total_sheets_provided = reams_allocated * 500
     remaining_sheets = total_sheets_provided - gross_sheets_needed
     
