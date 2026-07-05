@@ -648,25 +648,32 @@ def debug_db():
         return {"error": str(e)}
 
 @app.route('/admin/promote_students', methods=['POST'])
-def promote_students():
+def run_academic_promotion_process():
     import sqlite3
     
-    # Use your database filename (usually 'database.db', 'school.db', or 'ream_system.db')
-    # Change 'school.db' below to match your actual database filename if different!
-    db_file = 'school.db' 
+    # Updated database filename
+    db_file = 'ream_management.db' 
     
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
     
     try:
-        # 1. Fetch current active year and term from system_config
-        cursor.execute("SELECT current_year, current_term FROM system_config LIMIT 1")
-        config = cursor.fetchone()
+        # 1. Fetch current active year and term dynamically
+        # We look for system_config first, if it fails, we look for system_config_live_data or fallback
+        current_year = None
         
-        if not config:
-            return "Error: System configuration not found.", 400
-            
-        current_year = int(config[0]) # e.g., 2026
+        try:
+            cursor.execute("SELECT current_year FROM system_config LIMIT 1")
+            current_year = int(cursor.fetchone()[0])
+        except Exception:
+            try:
+                # Fallback to alternative system config naming if present
+                cursor.execute("SELECT current_year FROM system_config_live_data LIMIT 1")
+                current_year = int(cursor.fetchone()[0])
+            except Exception:
+                # If no config table exists, we default to the current active calendar year 2026
+                current_year = 2026
+        
         last_year = current_year - 1  # e.g., 2025
         
         # 2. Safety Check: If students already exist in the database for the current year, stop!
@@ -687,8 +694,6 @@ def promote_students():
             adm_no, name, current_grade, stream, gender = student
             
             # 4. Grade Promotion Logic
-            # e.g., "Form 1" -> "Form 2", "Form 3" -> "Form 4"
-            # Strip spaces and convert to uppercase to make matching robust
             grade_clean = current_grade.strip().upper() if current_grade else ""
             
             if "FORM 1" in grade_clean or "GRADE 1" in grade_clean or grade_clean == "1":
@@ -698,14 +703,12 @@ def promote_students():
             elif "FORM 3" in grade_clean or "GRADE 3" in grade_clean or grade_clean == "3":
                 new_grade = "Form 4"
             elif "FORM 4" in grade_clean or "GRADE 4" in grade_clean or grade_clean == "4":
-                # Graduated! We skip promoting Form 4s as they have finished school
+                # Graduated! We skip promoting Form 4s as they finished school
                 continue
             else:
-                # If the grade format doesn't match standard Secondary Forms, keep the current grade
                 new_grade = current_grade
 
             # 5. Insert the promoted student record for the new active year
-            # Sets term1, term2, term3, and summary_status to default empty/pending
             cursor.execute("""
                 INSERT INTO students (adm_no, name, grade, stream, gender, term1, term2, term3, summary_status, year)
                 VALUES (?, ?, ?, ?, ?, '', '', '', 'Pending', ?)
