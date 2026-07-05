@@ -281,13 +281,25 @@ def add_student():
     grade = request.form['grade'].strip()
     stream = request.form['stream'].strip()
     gender = request.form['gender']
+    
     conn = get_db_connection()
     try:
-        conn.execute('INSERT INTO students (adm_no, name, grade, stream, gender) VALUES (?, ?, ?, ?, ?)', (adm_no, name, grade, stream, gender))
+        # 1. Fetch the active year from the system configuration
+        config = conn.execute('SELECT current_year FROM system_config LIMIT 1').fetchone()
+        active_year = str(config['current_year']).strip() if (config and config['current_year']) else "2026"
+        
+        # 2. Insert the student AND save the active year into the 'year' column!
+        conn.execute('''
+            INSERT INTO students (adm_no, name, grade, stream, gender, year) 
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (adm_no, name, grade, stream, gender, active_year))
+        
         conn.commit()
     except sqlite3.IntegrityError:
         pass
-    conn.close()
+    finally:
+        conn.close()
+        
     return redirect('/admin')
 
 # ------------------ REAM TAKER DESK ------------------
@@ -299,13 +311,10 @@ def ream_taker_dashboard():
     conn = get_db_connection()
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     
-    # Read the active year parameter (it could be '2025' as a string)
     active_year = "2026"
     if config and config['current_year']:
         active_year = str(config['current_year']).strip()
     
-    # FORCE both sides to be integers during the comparison using CAST
-    # This prevents SQLite's text vs integer mismatch bug completely!
     students = conn.execute('''
         SELECT * FROM students 
         WHERE CAST(year AS INTEGER) = CAST(? AS INTEGER)
@@ -313,9 +322,9 @@ def ream_taker_dashboard():
     
     conn.close()
     
-    # --- TEMPORARY TEST LINE (REPLACES THE RENDER_TEMPLATE LINE) ---
-    #---return render_template('ream_taker.html', config=config, students=students)---
-    return f"DEBUG: Student 1 Year: {students[0]['year'] if len(students) > 0 else 'None'} | Student 2 Year: {students[1]['year'] if len(students) > 1 else 'None'}"
+    # Restore this line so the normal website page loads!
+    return render_template('ream_taker.html', config=config, students=students)
+    
 @app.route('/taker/submit/<adm_no>')
 @login_required
 @role_required(['Taker', 'Admin'])
