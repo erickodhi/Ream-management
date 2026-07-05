@@ -208,33 +208,32 @@ def allocate_exam_reams():
     conn.close()
     return redirect('/exam')
 
-# ------------------ NEW: PRINCIPAL AUDIT OVERVIEW ROUTE ------------------
+# ------------------ PRINCIPAL AUDIT OVERVIEW ROUTE ------------------
 @app.route('/principal')
 def principal_dashboard():
     conn = get_db_connection()
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     current_term_clean = config['current_term'].replace(" ", "").lower()
     
-    # 1. Expected Reams (Total students registered * 1 ream)
+    # 1. Expected Reams (Total students registered)
     total_students_row = conn.execute('SELECT COUNT(*) as total FROM students').fetchone()
     expected_reams = total_students_row['total'] if total_students_row else 0
     
-    # 2. Reams Received (Total students who turned in paper for this active term)
-    received_row = conn.execute(f"SELECT COUNT(*) as total FROM students WHERE {current_term_clean} = 'Submitted'").fetchone()
+    # FIX: 2. Reams Received (Completely case-insensitive wildcard matching)
+    received_row = conn.execute(f"SELECT COUNT(*) as total FROM students WHERE {current_term_clean} LIKE 'submitted%'").fetchone()
     reams_received = received_row['total'] if received_row else 0
     
-    # 3. Reams Consumed (Total reams officially checked out by the exam office)
+    # 3. Reams Consumed
     consumed_row = conn.execute('SELECT SUM(reams_allocated) as total FROM exam_allocations').fetchone()
     reams_consumed = consumed_row['total'] if consumed_row['total'] is not None else 0
     
-    # 4. Live Stock in Cabinet (Received whole reams minus what went out to printing room)
+    # 4. Live Stock in Cabinet
     live_stock_reams = reams_received - reams_consumed
     
-    # 5. Total Leftover Sheets (Paper remnants sitting loose in the print tray)
+    # 5. Total Leftover Sheets
     leftover_sheets_row = conn.execute('SELECT SUM(remaining_sheets) as total FROM exam_allocations').fetchone()
     leftover_sheets = leftover_sheets_row['total'] if leftover_sheets_row['total'] is not None else 0
     
-    # Fetch recent printing allocations for the principal's structural verification log
     recent_logs = conn.execute('SELECT * FROM exam_allocations ORDER BY date_logged DESC LIMIT 10').fetchall()
     conn.close()
     
