@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, jsonify
 import sqlite3
 import math
+import africastalking  # 1. Import the SMS module smoothly
 
 app = Flask(__name__)
 
@@ -205,7 +206,49 @@ def allocate_exam_reams():
          expected_sheets, extra_sheets, gross_sheets_needed, 
          reams_allocated, remaining_sheets, term_context, year_context))
     conn.commit()
+    
+    # Calculate fresh real-time numbers for the SMS message contents
+    t1 = conn.execute("SELECT COUNT(*) as total FROM students WHERE term1 LIKE 'submitted%'").fetchone()['total']
+    t2 = conn.execute("SELECT COUNT(*) as total FROM students WHERE term2 LIKE 'submitted%'").fetchone()['total']
+    t3 = conn.execute("SELECT COUNT(*) as total FROM students WHERE term3 LIKE 'submitted%'").fetchone()['total']
+    reams_received = t1 + t2 + t3
+    
+    consumed_row = conn.execute('SELECT SUM(reams_allocated) as total FROM exam_allocations').fetchone()
+    reams_consumed = consumed_row['total'] if consumed_row['total'] is not None else 0
+    live_stock_reams = reams_received - reams_consumed
+    
+    leftover_sheets_row = conn.execute('SELECT SUM(remaining_sheets) as total FROM exam_allocations').fetchone()
+    leftover_sheets = leftover_sheets_row['total'] if leftover_sheets_row['total'] is not None else 0
     conn.close()
+    
+    # SMS BROADCAST PROTOCOL
+    try:
+        # ⚠️ CHANGE THESE TWO LINES WITH YOUR AFRICA'S TALKING DETAILS
+        username = "Ream management"
+        api_key = atsk_150095793ca7c34e2ed5669c13890c23d365ceff904df3f94fab0afef3173d8e0d947b1c
+        
+        africastalking.initialize(username, api_key)
+        sms = africastalking.SMS
+        
+        # ⚠️ CHANGE THESE TO THE ACTUAL PHONE NUMBERS (Keep the plus sign and country code)
+        recipients = ["+254755479890", "+254746727068"] 
+        
+        sms_message = (
+            f"⚠️ ReamTracker Audit Update\n"
+            f"New Print Run: {exam_name} ({grade})\n"
+            f"---------------------------\n"
+            f"📦 Live Cabinet Stock: {live_stock_reams} Reams\n"
+            f"📉 Consumed Reams: {reams_consumed} Reams\n"
+            f"📄 Leftover Loose Paper: {leftover_sheets} sheets\n"
+            f"---------------------------\n"
+            f"Context: {term_context}, {year_context}"
+        )
+        
+        sms.send(sms_message, recipients)
+        print("Inventory text sent out successfully.")
+    except Exception as e:
+        print(f"SMS Broadcast failed to dispatch: {e}")
+        
     return redirect('/exam')
 
 # ------------------ PRINCIPAL AUDIT OVERVIEW ROUTE ------------------
@@ -214,25 +257,19 @@ def principal_dashboard():
     conn = get_db_connection()
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     
-    # 1. Expected Reams (Total students * 3 terms = Total expected capacity for the whole year)
     total_students_row = conn.execute('SELECT COUNT(*) as total FROM students').fetchone()
-    student_baseline = total_students_row['total'] if total_students_row else 0
-    expected_reams = student_baseline * 3
+    expected_reams = total_students_row['total'] if total_students_row else 0
     
-    # UPDATED: 2. Cumulative Reams Received (Cross-Term Check regardless of current active filter setting)
     t1_count = conn.execute("SELECT COUNT(*) as total FROM students WHERE term1 LIKE 'submitted%'").fetchone()['total']
     t2_count = conn.execute("SELECT COUNT(*) as total FROM students WHERE term2 LIKE 'submitted%'").fetchone()['total']
     t3_count = conn.execute("SELECT COUNT(*) as total FROM students WHERE term3 LIKE 'submitted%'").fetchone()['total']
     reams_received = t1_count + t2_count + t3_count
     
-    # 3. Reams Consumed
     consumed_row = conn.execute('SELECT SUM(reams_allocated) as total FROM exam_allocations').fetchone()
     reams_consumed = consumed_row['total'] if consumed_row['total'] is not None else 0
     
-    # 4. Live Stock in Cabinet
     live_stock_reams = reams_received - reams_consumed
     
-    # 5. Total Leftover Sheets
     leftover_sheets_row = conn.execute('SELECT SUM(remaining_sheets) as total FROM exam_allocations').fetchone()
     leftover_sheets = leftover_sheets_row['total'] if leftover_sheets_row['total'] is not None else 0
     
