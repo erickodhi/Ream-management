@@ -213,15 +213,17 @@ def allocate_exam_reams():
 def principal_dashboard():
     conn = get_db_connection()
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
-    current_term_clean = config['current_term'].replace(" ", "").lower()
     
-    # 1. Expected Reams (Total students registered)
+    # 1. Expected Reams (Total students * 3 terms = Total expected capacity for the whole year)
     total_students_row = conn.execute('SELECT COUNT(*) as total FROM students').fetchone()
-    expected_reams = total_students_row['total'] if total_students_row else 0
+    student_baseline = total_students_row['total'] if total_students_row else 0
+    expected_reams = student_baseline * 3
     
-    # FIX: 2. Reams Received (Completely case-insensitive wildcard matching)
-    received_row = conn.execute(f"SELECT COUNT(*) as total FROM students WHERE {current_term_clean} LIKE 'submitted%'").fetchone()
-    reams_received = received_row['total'] if received_row else 0
+    # UPDATED: 2. Cumulative Reams Received (Cross-Term Check regardless of current active filter setting)
+    t1_count = conn.execute("SELECT COUNT(*) as total FROM students WHERE term1 LIKE 'submitted%'").fetchone()['total']
+    t2_count = conn.execute("SELECT COUNT(*) as total FROM students WHERE term2 LIKE 'submitted%'").fetchone()['total']
+    t3_count = conn.execute("SELECT COUNT(*) as total FROM students WHERE term3 LIKE 'submitted%'").fetchone()['total']
+    reams_received = t1_count + t2_count + t3_count
     
     # 3. Reams Consumed
     consumed_row = conn.execute('SELECT SUM(reams_allocated) as total FROM exam_allocations').fetchone()
