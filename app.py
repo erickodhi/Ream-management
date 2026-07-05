@@ -224,7 +224,7 @@ def allocate_exam_reams():
     # SMS BROADCAST PROTOCOL
     try:
         # ⚠️ CHANGE THESE TWO LINES WITH YOUR AFRICA'S TALKING DETAILS
-        username = "Ream management"
+        username = "ReamManagement"
         api_key = atsk_150095793ca7c34e2ed5669c13890c23d365ceff904df3f94fab0afef3173d8e0d947b1c
         
         africastalking.initialize(username, api_key)
