@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Principal Executive Desk - ReamTracker</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</head>
+<body class="bg-gray-100 min-h-screen pb-12">
+    <nav class="bg-slate-900 shadow-md text-white mb-6">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
+            <span class="font-bold text-xl tracking-wide flex items-center gap-2">
+                ReamTracker Intelligence 📊 <span class="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-normal border border-emerald-500/30">HQ Desk</span>
+            </span>
+            <div class="space-x-6 text-sm font-medium">
+                <a href="/admin" class="text-slate-400 hover:text-white transition">Admin Registry</a>
+                <a href="/taker" class="text-slate-400 hover:text-white transition">Collection Desk</a>
+                <a href="/exam" class="text-slate-400 hover:text-white transition">Exam Calculator</a>
+                <a href="/principal" class="border-b-2 border-emerald-400 pb-1 font-semibold text-emerald-400">Principal Overview</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="max-w-7xl mx-auto px-6">
+        <div class="bg-white p-4 rounded-lg shadow-sm mb-6 flex justify-between items-center border-l-4 border-emerald-600">
+            <div>
+                <p class="text-xs uppercase text-gray-400 font-bold tracking-wider">Academic Term Audit Window</p>
+                <h3 class="text-lg font-bold text-gray-800">{{ config.current_term }} &mdash; Academic Year {{ config.current_year }}</h3>
+            </div>
+            <span class="bg-emerald-600 text-white text-xs font-bold tracking-wider uppercase px-3 py-1.5 rounded shadow-sm">
+                Authorization level: Principal
+            </span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            
+            <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-gray-400">Expected Reams</p>
+                <h3 class="text-2xl font-black text-slate-800 mt-2 font-mono">{{ expected_reams }}</h3>
+                <p class="text-[10px] text-gray-500 mt-1">Based on active registered student baseline.</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 border-t-4 border-blue-500">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-blue-500">Reams Collected</p>
+                <h3 class="text-2xl font-black text-blue-700 mt-2 font-mono">{{ reams_received }}</h3>
+                <p class="text-[10px] text-gray-500 mt-1">Physically turned in ('Submitted').</p>
+            </div>
+
+            <div class="bg-white p-5 rounded-lg shadow-sm border border-gray-200 border-t-4 border-amber-500">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-amber-600">Reams Consumed</p>
+                <h3 class="text-2xl font-black text-amber-700 mt-2 font-mono">{{ reams_consumed }}</h3>
+                <p class="text-[10px] text-gray-500 mt-1">Issued out to Examination printing room.</p>
+            </div>
+
+            <div class="bg-emerald-50 p-5 rounded-lg shadow-sm border border-emerald-200 border-t-4 border-emerald-600">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Live Cabinet Stock</p>
+                <h3 class="text-2xl font-black text-emerald-800 mt-2 font-mono">{{ live_stock_reams }} Reams</h3>
+                <p class="text-[10px] text-emerald-600 font-medium mt-1">Unopened whole units in store.</p>
+            </div>
+
+            <div class="bg-slate-900 p-5 rounded-lg shadow-sm text-white">
+                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Loose Leftover Sheets</p>
+                <h3 class="text-2xl font-black text-teal-400 mt-2 font-mono">{{ leftover_sheets }} shs</h3>
+                <p class="text-[10px] text-slate-400 mt-1">Open package remnants in custody.</p>
+            </div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <h2 class="text-base font-bold text-gray-800 border-b pb-2 mb-4">Verification Audit Log &mdash; Exam Print Issues</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase">
+                            <th class="p-3">Examination Target</th>
+                            <th class="p-3 text-center">Students Sitting</th>
+                            <th class="p-3 text-center">Gross Sheets (incl. 60 buffer)</th>
+                            <th class="p-3 text-center">Whole Reams Checked Out</th>
+                            <th class="p-3 text-right">Loose Tray Remnants Saved</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100 text-gray-600">
+                        {% for item in recent_logs %}
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="p-3">
+                                <span class="font-bold text-gray-800 text-sm block">{{ item.exam_name }}</span>
+                                <span class="text-gray-400 font-mono text-[10px]">{{ item.date_logged }} | {{ item.term_context }}</span>
+                            </td>
+                            <td class="p-3 text-center font-medium">{{ item.grade }} ({{ item.student_count }} kids)</td>
+                            <td class="p-3 text-center font-mono text-gray-700">{{ item.gross_sheets_needed }}</td>
+                            <td class="p-3 text-center font-black text-amber-600 font-mono">{{ item.reams_allocated }}</td>
+                            <td class="p-3 text-right font-bold text-slate-800 font-mono bg-slate-50">{{ item.remaining_sheets }} sheets</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="p-6 text-center text-gray-400">No print runs logged in database logs.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

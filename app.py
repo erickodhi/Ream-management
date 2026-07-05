@@ -164,11 +164,8 @@ def exam_dashboard():
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     distinct_grades = conn.execute('SELECT DISTINCT grade FROM students ORDER BY grade').fetchall()
     allocations = conn.execute('SELECT * FROM exam_allocations ORDER BY date_logged DESC').fetchall()
-    
-    # NEW MATH: Compute the grandfather total of all remaining sheets dynamically from the database
     total_remnants_row = conn.execute('SELECT SUM(remaining_sheets) as total_rem FROM exam_allocations').fetchone()
     grand_total_leftover = total_remnants_row['total_rem'] if total_remnants_row['total_rem'] is not None else 0
-    
     conn.close()
     return render_template('exam.html', config=config, distinct_grades=distinct_grades, allocations=allocations, grand_total_leftover=grand_total_leftover)
 
@@ -210,6 +207,45 @@ def allocate_exam_reams():
     conn.commit()
     conn.close()
     return redirect('/exam')
+
+# ------------------ NEW: PRINCIPAL AUDIT OVERVIEW ROUTE ------------------
+@app.route('/principal')
+def principal_dashboard():
+    conn = get_db_connection()
+    config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
+    current_term_clean = config['current_term'].replace(" ", "").lower()
+    
+    # 1. Expected Reams (Total students registered * 1 ream)
+    total_students_row = conn.execute('SELECT COUNT(*) as total FROM students').fetchone()
+    expected_reams = total_students_row['total'] if total_students_row else 0
+    
+    # 2. Reams Received (Total students who turned in paper for this active term)
+    received_row = conn.execute(f"SELECT COUNT(*) as total FROM students WHERE {current_term_clean} = 'Submitted'").fetchone()
+    reams_received = received_row['total'] if received_row else 0
+    
+    # 3. Reams Consumed (Total reams officially checked out by the exam office)
+    consumed_row = conn.execute('SELECT SUM(reams_allocated) as total FROM exam_allocations').fetchone()
+    reams_consumed = consumed_row['total'] if consumed_row['total'] is not None else 0
+    
+    # 4. Live Stock in Cabinet (Received whole reams minus what went out to printing room)
+    live_stock_reams = reams_received - reams_consumed
+    
+    # 5. Total Leftover Sheets (Paper remnants sitting loose in the print tray)
+    leftover_sheets_row = conn.execute('SELECT SUM(remaining_sheets) as total FROM exam_allocations').fetchone()
+    leftover_sheets = leftover_sheets_row['total'] if leftover_sheets_row['total'] is not None else 0
+    
+    # Fetch recent printing allocations for the principal's structural verification log
+    recent_logs = conn.execute('SELECT * FROM exam_allocations ORDER BY date_logged DESC LIMIT 10').fetchall()
+    conn.close()
+    
+    return render_template('principal.html', 
+                           config=config,
+                           expected_reams=expected_reams,
+                           reams_received=reams_received,
+                           reams_consumed=reams_consumed,
+                           live_stock_reams=live_stock_reams,
+                           leftover_sheets=leftover_sheets,
+                           recent_logs=recent_logs)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
