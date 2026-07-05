@@ -225,7 +225,7 @@ def allocate_exam_reams():
     try:
         # ⚠️ CHANGE THESE TWO LINES WITH YOUR AFRICA'S TALKING DETAILS
         username = "ReamManagement"
-        api_key = "atsk_150095793ca7c34e2ed5669c13890c23d365ceff904df3f94fab0afef3173d8e0d947b1c"
+        api_key = "atsk_cb7f17f79b851238d02dd731f24126f1f841fb46c07f2358788481ad37ee2579bad18699"
         
         africastalking.initialize(username, api_key)
         sms = africastalking.SMS
