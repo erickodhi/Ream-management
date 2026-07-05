@@ -30,7 +30,7 @@ def init_db():
             summary_status TEXT DEFAULT '3 Reams Owed'
         )''')
     
-    # UPDATED: Comprehensive Audit Trail Table for Examination allocations
+    # UPDATED: Added remaining_sheets column for explicit paper audit tracking
     conn.execute('''
         CREATE TABLE IF NOT EXISTS exam_allocations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,6 +42,7 @@ def init_db():
             extra_sheets INTEGER DEFAULT 60,
             gross_sheets_needed INTEGER NOT NULL,
             reams_allocated INTEGER NOT NULL,
+            remaining_sheets INTEGER NOT NULL,
             term_context TEXT NOT NULL,
             year_context TEXT NOT NULL,
             date_logged TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -169,7 +170,7 @@ def exam_dashboard():
     distinct_grades = conn.execute('SELECT DISTINCT grade FROM students ORDER BY grade').fetchall()
     allocations = conn.execute('SELECT * FROM exam_allocations ORDER BY date_logged DESC').fetchall()
     conn.close()
-    return render_template('exam.html', config=config, distinct_grades=distinct_grades, allocations=allocations)
+    return render_template('exam1.html', config=config, distinct_grades=distinct_grades, allocations=allocations)
 
 @app.route('/api/get_grade_count')
 def get_grade_count():
@@ -188,22 +189,25 @@ def allocate_exam_reams():
     term_context = request.form['term_context']
     year_context = request.form['year_context']
     
-    # Mathematical execution matching the strict audit requirement
     expected_sheets = student_count * sheets_per_student
     extra_sheets = 60
     gross_sheets_needed = expected_sheets + extra_sheets
     reams_allocated = math.ceil(gross_sheets_needed / 500)
+    
+    # NEW MATH: Calculate the leftover loose paper sheets remaining from the opened reams
+    total_sheets_provided = reams_allocated * 500
+    remaining_sheets = total_sheets_provided - gross_sheets_needed
     
     conn = get_db_connection()
     conn.execute('''
         INSERT INTO exam_allocations (
             exam_name, grade, student_count, sheets_per_student, 
             expected_sheets, extra_sheets, gross_sheets_needed, 
-            reams_allocated, term_context, year_context
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
+            reams_allocated, remaining_sheets, term_context, year_context
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''', 
         (exam_name, grade, student_count, sheets_per_student, 
          expected_sheets, extra_sheets, gross_sheets_needed, 
-         reams_allocated, term_context, year_context))
+         reams_allocated, remaining_sheets, term_context, year_context))
     conn.commit()
     conn.close()
     return redirect('/exam')

@@ -81,7 +81,11 @@
                         </div>
                         <div class="flex justify-between items-center pt-2 border-t border-gray-200">
                             <span class="font-bold text-gray-700">Approx. Reams to Issue:</span>
-                            <span id="lblTotalReams" class="text-base font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">0 Reams</span>
+                            <span id="lblTotalReams" class="text-sm font-black text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded">0 Reams</span>
+                        </div>
+                        <div class="flex justify-between text-slate-500 bg-slate-100 p-2 rounded border border-slate-200 font-medium">
+                            <span>Leftover Loose Sheets (Remnants):</span>
+                            <span id="lblRemainingSheets" class="font-black text-slate-800">0 sheets</span>
                         </div>
                     </div>
 
@@ -98,10 +102,9 @@
                         <thead>
                             <tr class="bg-gray-50 border-b border-gray-200 text-gray-500 font-bold uppercase">
                                 <th class="p-3">Paper & Class Details</th>
-                                <th class="p-3 text-center">Base Sheets</th>
-                                <th class="p-3 text-center">Buffer</th>
                                 <th class="p-3 text-center">Gross Sum</th>
-                                <th class="p-3 text-right">Reams Issued</th>
+                                <th class="p-3 text-center">Reams Issued</th>
+                                <th class="p-3 text-right">Leftover Loose Sheets</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 text-gray-600">
@@ -109,17 +112,16 @@
                             <tr class="hover:bg-gray-50 transition">
                                 <td class="p-3">
                                     <span class="font-bold text-gray-800 text-sm block">{{ item.exam_name }}</span>
-                                    <span class="text-gray-500 font-medium text-xs">{{ item.grade }} &bull; {{ item.student_count }} students @ {{ item.sheets_per_student }} shs</span>
+                                    <span class="text-gray-500 font-medium text-xs">{{ item.grade }} &bull; {{ item.student_count }} students @ {{ item.sheets_per_student }} shs (+60 buffer)</span>
                                     <p class="text-[10px] text-gray-400 font-mono mt-0.5">{{ item.date_logged }} | {{ item.term_context }}</p>
                                 </td>
-                                <td class="p-3 text-center font-mono font-medium">{{ item.expected_sheets }}</td>
-                                <td class="p-3 text-center text-amber-700 font-mono font-bold">+{{ item.extra_sheets }}</td>
                                 <td class="p-3 text-center font-mono font-bold text-gray-900 bg-gray-50">{{ item.gross_sheets_needed }}</td>
-                                <td class="p-3 text-right font-black text-indigo-600 text-sm">{{ item.reams_allocated }} Reams</td>
+                                <td class="p-3 text-center font-black text-indigo-600">{{ item.reams_allocated }} Reams</td>
+                                <td class="p-3 text-right font-mono font-bold text-slate-600 bg-slate-50">{{ item.remaining_sheets }} sheets</td>
                             </tr>
                             {% else %}
                             <tr>
-                                <td colspan="5" class="p-6 text-center text-gray-400">No calculation records or audit entries tracked yet.</td>
+                                <td colspan="4" class="p-6 text-center text-gray-400">No calculation records or audit entries tracked yet.</td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -139,6 +141,7 @@
         const lblExpectedSheets = document.getElementById('lblExpectedSheets');
         const lblGrossSheets = document.getElementById('lblGrossSheets');
         const lblTotalReams = document.getElementById('lblTotalReams');
+        const lblRemainingSheets = document.getElementById('lblRemainingSheets');
 
         gradeSelect.addEventListener('change', async () => {
             const grade = gradeSelect.value;
@@ -159,15 +162,19 @@
             const students = parseInt(studentCountInput.value) || 0;
             const sheetsPerStudent = parseInt(sheetsInput.value) || 0;
             
-            // Core calculations matching database audit fields
             const expectedSheets = students * sheetsPerStudent;
             const extraSheets = 60; 
             const grossSheets = expectedSheets > 0 ? (expectedSheets + extraSheets) : 0;
             const totalReams = Math.ceil(grossSheets / 500);
             
+            // Remnant Math
+            const totalSheetsProvided = totalReams * 500;
+            const remainingSheets = totalSheetsProvided - grossSheets;
+            
             lblExpectedSheets.innerText = expectedSheets.toLocaleString() + " sheets";
             lblGrossSheets.innerText = grossSheets.toLocaleString() + " sheets";
             lblTotalReams.innerText = totalReams + " Ream" + (totalReams !== 1 ? "s" : "");
+            lblRemainingSheets.innerText = expectedSheets > 0 ? (remainingSheets.toLocaleString() + " sheets") : "0 sheets";
         }
 
         studentCountInput.addEventListener('input', runAutomaticMathCalculator);
