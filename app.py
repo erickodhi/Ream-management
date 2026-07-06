@@ -632,21 +632,26 @@ def principal_dashboard():
     conn = get_db_connection()
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     
+    # Count total enrolled students
     total_students_row = conn.execute('SELECT COUNT(*) as total FROM students').fetchone()
-    expected_reams = total_students_row['total'] if total_students_row else 0
+    total_students = total_students_row['total'] if total_students_row else 0
     
+    # 10 students x 3 terms = 30 expected reams
+    expected_reams = total_students * 3
+    
+    # Count reams brought this academic cycle
     t1_count = conn.execute("SELECT COUNT(*) as total FROM students WHERE term1 LIKE 'submitted%'").fetchone()['total']
     t2_count = conn.execute("SELECT COUNT(*) as total FROM students WHERE term2 LIKE 'submitted%'").fetchone()['total']
     t3_count = conn.execute("SELECT COUNT(*) as total FROM students WHERE term3 LIKE 'submitted%'").fetchone()['total']
     reams_received = t1_count + t2_count + t3_count
     
     consumed_row = conn.execute('SELECT SUM(reams_allocated) as total FROM exam_allocations').fetchone()
-    reams_consumed = consumed_row['total'] if consumed_row['total'] is not None else 0
+    reams_consumed = consumed_row['total'] if (consumed_row and consumed_row['total'] is not None) else 0
     
     live_stock_reams = reams_received - reams_consumed
     
     leftover_sheets_row = conn.execute('SELECT SUM(remaining_sheets) as total FROM exam_allocations').fetchone()
-    leftover_sheets = leftover_sheets_row['total'] if leftover_sheets_row['total'] is not None else 0
+    leftover_sheets = leftover_sheets_row['total'] if (leftover_sheets_row and leftover_sheets_row['total'] is not None) else 0
     
     recent_logs = conn.execute('SELECT * FROM exam_allocations ORDER BY date_logged DESC LIMIT 10').fetchall()
     conn.close()
