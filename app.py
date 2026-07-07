@@ -653,47 +653,57 @@ import sqlite3
 import os
 import sqlite3
 
+import os
+import sqlite3
+
 @app.route('/admin/promote_students', methods=['POST'])
 def run_academic_promotion_process():
-    base_dir = os.path.abspath(os.path.dirname(__file__))
-    
-    possible_paths = [
-        os.path.join(base_dir, 'instance', 'ream_management.db'),
-        os.path.join(base_dir, 'instance', 'database.db'),
-        os.path.join(base_dir, 'ream_management.db'),
-        os.path.join(base_dir, 'database.db')
-    ]
-    
     db_file = None
-    for path in possible_paths:
-        if os.path.exists(path):
-            try:
-                test_conn = sqlite3.connect(path)
-                count = test_conn.cursor().execute("SELECT COUNT(*) FROM students").fetchone()[0]
-                test_conn.close()
-                if count > 0:
-                    db_file = path
-                    break
-            except Exception:
-                continue
 
-    if not db_file:
-        return "<h1>Database Error</h1><p>Could not locate the database containing student records.</p><p><a href='/admin'>Go Back</a></p>"
+    # 1. First, try to inspect Flask / SQLAlchemy app config for the active DB path
+    try:
+        db_uri = app.config.get('SQLALCHEMY_DATABASE_URI', '')
+        if db_uri.startswith('sqlite:///'):
+            db_file = db_uri.replace('sqlite:///', '')
+            if not os.path.isabs(db_file):
+                db_file = os.path.join(app.root_path, db_file)
+    except Exception:
+        pass
+
+    # 2. Fallback search across directory tree for any .db file containing student data
+    if not db_file or not os.path.exists(db_file):
+        base_dir = os.path.abspath(os.path.dirname(__file__))
+        for root, dirs, files in os.walk(base_dir):
+            for file in files:
+                if file.endswith('.db'):
+                    candidate = os.path.join(root, file)
+                    try:
+                        t_conn = sqlite3.connect(candidate)
+                        cnt = t_conn.cursor().execute("SELECT COUNT(*) FROM students").fetchone()[0]
+                        t_conn.close()
+                        if cnt > 0:
+                            db_file = candidate
+                            break
+                    except Exception:
+                        continue
+            if db_file:
+                break
+
+    if not db_file or not os.path.exists(db_file):
+        return "<h1>Database Error</h1><p>Could not locate any SQLite database containing student records on this server.</p><p><a href='/admin'>Go Back</a></p>"
 
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
     
     try:
-        # Check table columns to detect whether it uses 'form' or 'grade'
+        # Detect column schema dynamically (form vs grade)
         cursor.execute("PRAGMA table_info(students)")
         columns = [col[1] for col in cursor.fetchall()]
         
         form_col = "form" if "form" in columns else ("grade" if "grade" in columns else None)
-        
         if not form_col:
-            return "<h1>Schema Error</h1><p>Could not find a 'form' or 'grade' column in the students table.</p><p><a href='/admin'>Go Back</a></p>"
+            return f"<h1>Schema Error</h1><p>Found database at <code>{db_file}</code>, but 'form' or 'grade' column is missing.</p><p><a href='/admin'>Go Back</a></p>"
 
-        # Fetch students using the dynamically detected column name
         cursor.execute(f"SELECT adm_no, name, {form_col} FROM students")
         students = cursor.fetchall()
 
@@ -725,8 +735,9 @@ def run_academic_promotion_process():
         return f"""
         <div style="font-family: sans-serif; padding: 20px;">
             <h1 style="color: #16a34a;">Promotion Complete!</h1>
+            <p style="font-size: 16px;">Target Database: <code>{db_file}</code></p>
             <p style="font-size: 16px;"><strong>{promoted_count}</strong> students were successfully promoted.</p>
-            <p style="font-size: 16px;"><strong>{graduated_count}</strong> Form 4 / Grade 4 students were marked as Graduated.</p>
+            <p style="font-size: 16px;"><strong>{graduated_count}</strong> Form 4 / Grade 4 students marked as Graduated.</p>
             <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
