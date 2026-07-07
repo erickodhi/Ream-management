@@ -651,51 +651,38 @@ def debug_db():
 def run_academic_promotion_process():
     import sqlite3
     
-    # Updated database filename
     db_file = 'ream_management.db' 
-    
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
     
     try:
-        # 1. Fetch current active year and term dynamically
-        # We look for system_config first, if it fails, we look for system_config_live_data or fallback
-        current_year = None
+        # Define the academic transition
+        last_year = 2025
+        current_year = 2026
         
-        try:
-            cursor.execute("SELECT current_year FROM system_config LIMIT 1")
-            current_year = int(cursor.fetchone()[0])
-        except Exception:
-            try:
-                # Fallback to alternative system config naming if present
-                cursor.execute("SELECT current_year FROM system_config_live_data LIMIT 1")
-                current_year = int(cursor.fetchone()[0])
-            except Exception:
-                # If no config table exists, we default to the current active calendar year 2026
-                current_year = 2026
-        
-        last_year = current_year - 1  # e.g., 2025
-        
-        # 2. Safety Check: If students already exist in the database for the current year, stop!
-        cursor.execute("SELECT COUNT(*) FROM students WHERE year = ?", (current_year,))
-        existing_count = cursor.fetchone()[0]
-        if existing_count > 0:
-            return f"Promotion aborted: There are already {existing_count} student records registered for the year {current_year}.", 400
-
-        # 3. Fetch all active students from last year
+        # 1. Fetch all students from 2025
         cursor.execute("SELECT adm_no, name, grade, stream, gender FROM students WHERE year = ?", (last_year,))
         last_year_students = cursor.fetchall()
         
         if not last_year_students:
-            return f"No student records found in the system for the previous year ({last_year}) to promote.", 400
+            return f"<h1>No Students Found</h1><p>No student records found for the year {last_year} to promote.</p><p><a href='/admin'>Go Back</a></p>"
 
         promoted_count = 0
+        skipped_count = 0
+
         for student in last_year_students:
             adm_no, name, current_grade, stream, gender = student
             
-            # 4. Grade Promotion Logic
-            grade_clean = current_grade.strip().upper() if current_grade else ""
+            # 2. Check if student is already registered in 2026
+            cursor.execute("SELECT COUNT(*) FROM students WHERE adm_no = ? AND year = ?", (adm_no, current_year))
+            already_exists = cursor.fetchone()[0] > 0
             
+            if already_exists:
+                skipped_count += 1
+                continue  # Skip to prevent duplicates
+
+            # 3. Grade Promotion Logic
+            grade_clean = current_grade.strip().upper() if current_grade else ""
             if "FORM 1" in grade_clean or "GRADE 1" in grade_clean or grade_clean == "1":
                 new_grade = "Form 2"
             elif "FORM 2" in grade_clean or "GRADE 2" in grade_clean or grade_clean == "2":
@@ -703,12 +690,12 @@ def run_academic_promotion_process():
             elif "FORM 3" in grade_clean or "GRADE 3" in grade_clean or grade_clean == "3":
                 new_grade = "Form 4"
             elif "FORM 4" in grade_clean or "GRADE 4" in grade_clean or grade_clean == "4":
-                # Graduated! We skip promoting Form 4s as they finished school
+                # Graduated students are skipped
                 continue
             else:
                 new_grade = current_grade
 
-            # 5. Insert the promoted student record for the new active year
+            # 4. Insert promoted student for 2026
             cursor.execute("""
                 INSERT INTO students (adm_no, name, grade, stream, gender, term1, term2, term3, summary_status, year)
                 VALUES (?, ?, ?, ?, ?, '', '', '', 'Pending', ?)
@@ -716,11 +703,19 @@ def run_academic_promotion_process():
             promoted_count += 1
             
         conn.commit()
-        return f"<h1>Success!</h1><p>Successfully promoted {promoted_count} students from {last_year} to {current_year}.</p><p><a href='/admin'>Go Back to Admin Dashboard</a></p>"
+        
+        return f"""
+        <div style="font-family: sans-serif; padding: 20px;">
+            <h1 style="color: #16a34a;">Promotion Complete!</h1>
+            <p><strong>{promoted_count}</strong> students were successfully promoted from {last_year} to {current_year}.</p>
+            <p><strong>{skipped_count}</strong> students were already registered in {current_year} and skipped safely.</p>
+            <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px;">Return to Admin Dashboard</a>
+        </div>
+        """
 
     except Exception as e:
         conn.rollback()
-        return f"An error occurred during database migration: {str(e)}", 500
+        return f"An error occurred during promotion: {str(e)}", 500
     finally:
         conn.close()
     
