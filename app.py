@@ -679,15 +679,18 @@ def run_academic_promotion_process():
     cursor = conn.cursor()
 
     try:
-        to_year = "2027"
-
         # 1. Detect grade vs form column name
         cursor.execute("PRAGMA table_info(students)")
         cols = [col[1] for col in cursor.fetchall()]
         form_col = 'grade' if 'grade' in cols else ('form' if 'form' in cols else 'grade')
+        has_year_col = 'year' in cols
 
-        # 2. Fetch ALL enrolled students
-        cursor.execute(f"SELECT adm_no, {form_col} FROM students")
+        # 2. Fetch ALL enrolled students along with their current year
+        if has_year_col:
+            cursor.execute(f"SELECT adm_no, {form_col}, year FROM students")
+        else:
+            cursor.execute(f"SELECT adm_no, {form_col}, '2026' FROM students")
+            
         current_students = cursor.fetchall()
 
         if not current_students:
@@ -695,8 +698,21 @@ def run_academic_promotion_process():
 
         promoted_count = 0
 
-        # 3. Advance each student's class and update their year to 2027
-        for adm_no, current_class in current_students:
+        # 3. Process each student dynamically based on their existing year
+        for student in current_students:
+            adm_no = student[0]
+            current_class = student[1]
+            raw_year = student[2]
+
+            # Calculate next year (e.g., 2026 -> 2027, 2027 -> 2028)
+            try:
+                current_yr_int = int(str(raw_year).strip()) if raw_year else 2026
+            except ValueError:
+                current_yr_int = 2026
+
+            next_year = str(current_yr_int + 1)
+
+            # Determine next grade level
             class_clean = str(current_class).strip().upper() if current_class else ""
 
             if "1" in class_clean:
@@ -710,11 +726,12 @@ def run_academic_promotion_process():
             else:
                 new_class = current_class
 
+            # Update the student's record with new class and incremented year
             cursor.execute(f"""
                 UPDATE students 
                 SET {form_col} = ?, year = ? 
                 WHERE adm_no = ?
-            """, (new_class, to_year, adm_no))
+            """, (new_class, next_year, adm_no))
 
             promoted_count += 1
 
@@ -723,7 +740,7 @@ def run_academic_promotion_process():
         return f"""
         <div style="font-family: sans-serif; padding: 20px;">
             <h1 style="color: #16a34a;">Promotion Complete!</h1>
-            <p style="font-size: 16px;">Successfully promoted <strong>{promoted_count}</strong> students to <strong>{to_year}</strong>.</p>
+            <p style="font-size: 16px;">Successfully promoted <strong>{promoted_count}</strong> students to their next academic year.</p>
             <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
