@@ -684,16 +684,12 @@ def run_academic_promotion_process():
         cols = [col[1] for col in cursor.fetchall()]
         form_col = 'grade' if 'grade' in cols else ('form' if 'form' in cols else 'grade')
 
-        # 2. Check if students table uses a composite primary key or single adm_no primary key.
-        # If adm_no is the sole primary key, we migrate the table safely to allow multiple years per adm_no.
-        cursor.execute("PRAGMA table_xinfo(students)")
-        pk_cols = [row[0] for row in cursor.fetchall() if row[5] > 0] # row[5] > 0 means it's part of PK
+        # 2. Rebuild table with composite primary key (adm_no, year) if not done already
+        cursor.execute("PRAGMA table_info(students)")
+        pk_cols = [row[1] for row in cursor.fetchall() if row[5] > 0]
 
         if len(pk_cols) == 1 and pk_cols[0] == 'adm_no':
-            # Safely rebuild table with composite primary key (adm_no, year)
             cursor.execute("ALTER TABLE students RENAME TO students_old")
-            
-            # Recreate table with (adm_no, year) as primary key
             cursor.execute(f"""
                 CREATE TABLE students (
                     adm_no TEXT,
@@ -705,8 +701,6 @@ def run_academic_promotion_process():
                     PRIMARY KEY (adm_no, year)
                 )
             """)
-            
-            # Copy old data over, defaulting year to '2026' if missing
             cursor.execute(f"""
                 INSERT OR IGNORE INTO students (adm_no, name, {form_col}, stream, gender, year)
                 SELECT adm_no, name, {form_col}, stream, gender, COALESCE(NULLIF(year, ''), '2026') 
@@ -715,35 +709,28 @@ def run_academic_promotion_process():
             cursor.execute("DROP TABLE students_old")
             conn.commit()
 
-        # 3. Fetch all current active students for the latest year (e.g. 2026)
-        cursor.execute(f"SELECT adm_no, name, {form_col}, stream, gender, year FROM students")
-        current_students = cursor.fetchall()
+        # 3. Find the maximum existing year in the database (e.g., '2026')
+        max_year_row = cursor.execute("SELECT MAX(CAST(year AS INTEGER)) FROM students WHERE year IS NOT NULL AND year != ''").fetchone()
+        current_max_year = max_year_row[0] if (max_year_row and max_year_row[0]) else 2026
+        target_year = str(current_max_year + 1)
 
-        if not current_students:
-            return f"<h1>No Records Found</h1><p>There are no students in the database to promote.</p><p><a href='/admin'>Go Back</a></p>"
+        # 4. Fetch students strictly from the latest active year
+        cursor.execute(f"""
+            SELECT adm_no, name, {form_col}, stream, gender 
+            FROM students 
+            WHERE TRIM(CAST(year AS TEXT)) = ? OR year IS NULL OR year = ''
+        """, (str(current_max_year),))
+        latest_students = cursor.fetchall()
+
+        if not latest_students:
+            return f"<h1>No Records Found</h1><p>There are no active students in {current_max_year} to promote.</p><p><a href='/admin'>Go Back</a></p>"
 
         promoted_count = 0
 
-        for student in current_students:
-            adm_no, name, current_class, stream, gender, raw_year = student
-
-            # Determine current and next year
-            try:
-                current_yr_int = int(str(raw_year).strip()) if raw_year else 2026
-            except ValueError:
-                current_yr_int = 2026
-
-            next_year = str(current_yr_int + 1)
-
-            # Ensure existing row has its year explicitly stamped
-            cursor.execute(f"""
-                UPDATE students 
-                SET year = ? 
-                WHERE adm_no = ? AND year = ? AND (year IS NULL OR year = '')
-            """, (str(current_yr_int), adm_no, str(current_yr_int)))
-
-            # Determine next class level
+        # 5. Insert new promoted copies into the target next year
+        for adm_no, name, current_class, stream, gender in latest_students:
             class_clean = str(current_class).strip().upper() if current_class else ""
+            
             if "1" in class_clean:
                 new_class = "Grade 2" if form_col == 'grade' else "Form 2"
             elif "2" in class_clean:
@@ -755,11 +742,11 @@ def run_academic_promotion_process():
             else:
                 new_class = current_class
 
-            # 4. Insert the new promoted year record WITHOUT touching the old year's row
+            # Insert the new year row (will ignore if already exists)
             cursor.execute(f"""
-                INSERT OR IGNORE INTO students (adm_no, name, {form_col}, stream, gender, year)
+                INSERT OR REPLACE INTO students (adm_no, name, {form_col}, stream, gender, year)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (adm_no, name, new_class, stream, gender, next_year))
+            """, (adm_no, name, new_class, stream, gender, target_year))
 
             promoted_count += 1
 
@@ -768,7 +755,8 @@ def run_academic_promotion_process():
         return f"""
         <div style="font-family: sans-serif; padding: 20px;">
             <h1 style="color: #16a34a;">Promotion Complete!</h1>
-            <p style="font-size: 16px;">Successfully promoted students to <strong>{next_year}</strong> while keeping previous years intact.</p>
+            <p style="font-size: 16px;">Successfully promoted <strong>{promoted_count}</strong> students from <strong>{current_max_year}</strong> to <strong>{target_year}</strong>.</p>
+            <p style="font-size: 14px; color: #4b5563;">Previous year ({current_max_year}) records remain viewable in your dropdown filter.</p>
             <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
