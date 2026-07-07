@@ -679,23 +679,49 @@ def run_academic_promotion_process():
     cursor = conn.cursor()
 
     try:
-        # 1. Dynamically update students table structure if adm_no is strictly UNIQUE
-        cursor.execute("PRAGMA index_list(students)")
-        indexes = cursor.fetchall()
-        
-        # Check if table has a unique index strictly on adm_no
+        # 1. Detect column names dynamically
         cursor.execute("PRAGMA table_info(students)")
         cols = [col[1] for col in cursor.fetchall()]
         form_col = 'grade' if 'grade' in cols else ('form' if 'form' in cols else 'grade')
 
-        # 2. Fetch all current active students
+        # 2. Check if students table uses a composite primary key or single adm_no primary key.
+        # If adm_no is the sole primary key, we migrate the table safely to allow multiple years per adm_no.
+        cursor.execute("PRAGMA table_xinfo(students)")
+        pk_cols = [row[0] for row in cursor.fetchall() if row[5] > 0] # row[5] > 0 means it's part of PK
+
+        if len(pk_cols) == 1 and pk_cols[0] == 'adm_no':
+            # Safely rebuild table with composite primary key (adm_no, year)
+            cursor.execute("ALTER TABLE students RENAME TO students_old")
+            
+            # Recreate table with (adm_no, year) as primary key
+            cursor.execute(f"""
+                CREATE TABLE students (
+                    adm_no TEXT,
+                    name TEXT,
+                    {form_col} TEXT,
+                    stream TEXT,
+                    gender TEXT,
+                    year TEXT,
+                    PRIMARY KEY (adm_no, year)
+                )
+            """)
+            
+            # Copy old data over, defaulting year to '2026' if missing
+            cursor.execute(f"""
+                INSERT OR IGNORE INTO students (adm_no, name, {form_col}, stream, gender, year)
+                SELECT adm_no, name, {form_col}, stream, gender, COALESCE(NULLIF(year, ''), '2026') 
+                FROM students_old
+            """)
+            cursor.execute("DROP TABLE students_old")
+            conn.commit()
+
+        # 3. Fetch all current active students for the latest year (e.g. 2026)
         cursor.execute(f"SELECT adm_no, name, {form_col}, stream, gender, year FROM students")
         current_students = cursor.fetchall()
 
         if not current_students:
             return f"<h1>No Records Found</h1><p>There are no students in the database to promote.</p><p><a href='/admin'>Go Back</a></p>"
 
-        # 3. Create historical snapshots for the new year
         promoted_count = 0
 
         for student in current_students:
@@ -709,12 +735,12 @@ def run_academic_promotion_process():
 
             next_year = str(current_yr_int + 1)
 
-            # Ensure current year is stamped on existing row
+            # Ensure existing row has its year explicitly stamped
             cursor.execute(f"""
                 UPDATE students 
                 SET year = ? 
-                WHERE adm_no = ? AND (year IS NULL OR year = '')
-            """, (str(current_yr_int), adm_no))
+                WHERE adm_no = ? AND year = ? AND (year IS NULL OR year = '')
+            """, (str(current_yr_int), adm_no, str(current_yr_int)))
 
             # Determine next class level
             class_clean = str(current_class).strip().upper() if current_class else ""
@@ -729,9 +755,9 @@ def run_academic_promotion_process():
             else:
                 new_class = current_class
 
-            # Use INSERT OR REPLACE / INSERT OR IGNORE to add the new year without crashing
+            # 4. Insert the new promoted year record WITHOUT touching the old year's row
             cursor.execute(f"""
-                INSERT OR REPLACE INTO students (adm_no, name, {form_col}, stream, gender, year)
+                INSERT OR IGNORE INTO students (adm_no, name, {form_col}, stream, gender, year)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (adm_no, name, new_class, stream, gender, next_year))
 
@@ -742,7 +768,7 @@ def run_academic_promotion_process():
         return f"""
         <div style="font-family: sans-serif; padding: 20px;">
             <h1 style="color: #16a34a;">Promotion Complete!</h1>
-            <p style="font-size: 16px;">Successfully created <strong>{next_year}</strong> records for <strong>{promoted_count}</strong> students while keeping 2026 records intact.</p>
+            <p style="font-size: 16px;">Successfully promoted students to <strong>{next_year}</strong> while keeping previous years intact.</p>
             <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
