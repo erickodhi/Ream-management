@@ -651,18 +651,16 @@ def debug_db():
 def run_academic_promotion_process():
     import sqlite3
     
-    # Updated to point to your active database file
     db_file = 'database.db' 
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
     
     try:
-        # Define the academic transition
         last_year = 2025
         current_year = 2026
         
-        # 1. Fetch all students from 2025
-        cursor.execute("SELECT adm_no, name, grade, stream, gender FROM students WHERE year = ?", (last_year,))
+        # 1. Fetch 2025 students using the correct column 'form'
+        cursor.execute("SELECT adm_no, name, form, stream, gender FROM students WHERE year = ?", (last_year,))
         last_year_students = cursor.fetchall()
         
         if not last_year_students:
@@ -672,35 +670,35 @@ def run_academic_promotion_process():
         skipped_count = 0
 
         for student in last_year_students:
-            adm_no, name, current_grade, stream, gender = student
+            adm_no, name, current_form, stream, gender = student
             
-            # 2. Check if student is already registered in 2026
+            # 2. Check if student already exists in 2026
             cursor.execute("SELECT COUNT(*) FROM students WHERE adm_no = ? AND year = ?", (adm_no, current_year))
             already_exists = cursor.fetchone()[0] > 0
             
             if already_exists:
                 skipped_count += 1
-                continue  # Skip to prevent duplicates
+                continue
 
-            # 3. Grade Promotion Logic
-            grade_clean = current_grade.strip().upper() if current_grade else ""
-            if "FORM 1" in grade_clean or "GRADE 1" in grade_clean or grade_clean == "1":
-                new_grade = "Form 2"
-            elif "FORM 2" in grade_clean or "GRADE 2" in grade_clean or grade_clean == "2":
-                new_grade = "Form 3"
-            elif "FORM 3" in grade_clean or "GRADE 3" in grade_clean or grade_clean == "3":
-                new_grade = "Form 4"
-            elif "FORM 4" in grade_clean or "GRADE 4" in grade_clean or grade_clean == "4":
-                # Graduated students are skipped
+            # 3. Form Promotion Logic
+            form_clean = str(current_form).strip().upper() if current_form else ""
+            if "1" in form_clean or "FORM 1" in form_clean:
+                new_form = "Form 2"
+            elif "2" in form_clean or "FORM 2" in form_clean:
+                new_form = "Form 3"
+            elif "3" in form_clean or "FORM 3" in form_clean:
+                new_form = "Form 4"
+            elif "4" in form_clean or "FORM 4" in form_clean:
+                # Graduated Form 4s are not added to 2026
                 continue
             else:
-                new_grade = current_grade
+                new_form = current_form
 
             # 4. Insert promoted student for 2026
             cursor.execute("""
-                INSERT INTO students (adm_no, name, grade, stream, gender, term1, term2, term3, summary_status, year)
+                INSERT INTO students (adm_no, name, form, stream, gender, term1, term2, term3, summary_status, year)
                 VALUES (?, ?, ?, ?, ?, '', '', '', 'Pending', ?)
-            """, (adm_no, name, new_grade, stream, gender, current_year))
+            """, (adm_no, name, new_form, stream, gender, current_year))
             promoted_count += 1
             
         conn.commit()
