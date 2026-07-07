@@ -647,29 +647,50 @@ def debug_db():
     except Exception as e:
         return {"error": str(e)}
 
+import os
+import sqlite3
+
 @app.route('/admin/promote_students', methods=['POST'])
 def run_academic_promotion_process():
-    import sqlite3
+    # Detect absolute path to instance/database.db, database.db, or ream_management.db
+    base_dir = os.path.abspath(os.path.dirname(__file__))
     
-    db_file = 'database.db' 
+    possible_paths = [
+        os.path.join(base_dir, 'instance', 'database.db'),
+        os.path.join(base_dir, 'instance', 'ream_management.db'),
+        os.path.join(base_dir, 'database.db'),
+        os.path.join(base_dir, 'ream_management.db')
+    ]
+    
+    db_file = None
+    for path in possible_paths:
+        if os.path.exists(path):
+            # Check if this database actually has student records
+            try:
+                test_conn = sqlite3.connect(path)
+                count = test_conn.cursor().execute("SELECT COUNT(*) FROM students").fetchone()[0]
+                test_conn.close()
+                if count > 0:
+                    db_file = path
+                    break
+            except Exception:
+                continue
+
+    if not db_file:
+        return "<h1>Database Error</h1><p>Could not locate the database containing student records.</p><p><a href='/admin'>Go Back</a></p>"
+
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
     
     try:
-        # 1. Fetch ALL students currently in the table
         cursor.execute("SELECT adm_no, name, form FROM students")
         students = cursor.fetchall()
-        
-        if not students:
-            return "<h1>No Students Found</h1><p>There are no student records in the database at all.</p><p><a href='/admin'>Go Back</a></p>"
 
         promoted_count = 0
         graduated_count = 0
 
-        # 2. Update each student's Form directly
         for student in students:
             adm_no, name, current_form = student
-            
             form_clean = str(current_form).strip().upper() if current_form else ""
             
             if "1" in form_clean or "FORM 1" in form_clean:
@@ -690,8 +711,9 @@ def run_academic_promotion_process():
         return f"""
         <div style="font-family: sans-serif; padding: 20px;">
             <h1 style="color: #16a34a;">Promotion Complete!</h1>
-            <p style="font-size: 16px;"><strong>{promoted_count}</strong> students were successfully promoted to their next Form.</p>
-            <p style="font-size: 16px;"><strong>{graduated_count}</strong> Form 4 students were marked as Graduated.</p>
+            <p style="font-size: 16px;">Successfully updated <strong>{db_file}</strong>.</p>
+            <p style="font-size: 16px;"><strong>{promoted_count}</strong> students promoted (Form 1 &rarr; 2, Form 2 &rarr; 3, Form 3 &rarr; 4).</p>
+            <p style="font-size: 16px;"><strong>{graduated_count}</strong> Form 4 students marked as Graduated.</p>
             <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
