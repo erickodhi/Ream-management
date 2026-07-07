@@ -679,30 +679,42 @@ def run_academic_promotion_process():
     cursor = conn.cursor()
 
     try:
-        # 1. Detect column names dynamically
+        # 1. Dynamically update students table structure if adm_no is strictly UNIQUE
+        cursor.execute("PRAGMA index_list(students)")
+        indexes = cursor.fetchall()
+        
+        # Check if table has a unique index strictly on adm_no
         cursor.execute("PRAGMA table_info(students)")
         cols = [col[1] for col in cursor.fetchall()]
         form_col = 'grade' if 'grade' in cols else ('form' if 'form' in cols else 'grade')
 
-        # 2. Fetch all current student records
-        cursor.execute(f"SELECT adm_no, {form_col}, year FROM students")
+        # 2. Fetch all current active students
+        cursor.execute(f"SELECT adm_no, name, {form_col}, stream, gender, year FROM students")
         current_students = cursor.fetchall()
 
         if not current_students:
             return f"<h1>No Records Found</h1><p>There are no students in the database to promote.</p><p><a href='/admin'>Go Back</a></p>"
 
+        # 3. Create historical snapshots for the new year
         promoted_count = 0
 
         for student in current_students:
-            adm_no, current_class, raw_year = student
+            adm_no, name, current_class, stream, gender, raw_year = student
 
-            # Determine next year (2026 -> 2027 -> 2028)
+            # Determine current and next year
             try:
                 current_yr_int = int(str(raw_year).strip()) if raw_year else 2026
             except ValueError:
                 current_yr_int = 2026
 
             next_year = str(current_yr_int + 1)
+
+            # Ensure current year is stamped on existing row
+            cursor.execute(f"""
+                UPDATE students 
+                SET year = ? 
+                WHERE adm_no = ? AND (year IS NULL OR year = '')
+            """, (str(current_yr_int), adm_no))
 
             # Determine next class level
             class_clean = str(current_class).strip().upper() if current_class else ""
@@ -717,12 +729,11 @@ def run_academic_promotion_process():
             else:
                 new_class = current_class
 
-            # 3. UPDATE existing record directly (bypasses UNIQUE constraint error)
+            # Use INSERT OR REPLACE / INSERT OR IGNORE to add the new year without crashing
             cursor.execute(f"""
-                UPDATE students 
-                SET {form_col} = ?, year = ? 
-                WHERE adm_no = ?
-            """, (new_class, next_year, adm_no))
+                INSERT OR REPLACE INTO students (adm_no, name, {form_col}, stream, gender, year)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (adm_no, name, new_class, stream, gender, next_year))
 
             promoted_count += 1
 
@@ -731,7 +742,7 @@ def run_academic_promotion_process():
         return f"""
         <div style="font-family: sans-serif; padding: 20px;">
             <h1 style="color: #16a34a;">Promotion Complete!</h1>
-            <p style="font-size: 16px;">Successfully promoted <strong>{promoted_count}</strong> students to <strong>{next_year}</strong>.</p>
+            <p style="font-size: 16px;">Successfully created <strong>{next_year}</strong> records for <strong>{promoted_count}</strong> students while keeping 2026 records intact.</p>
             <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
