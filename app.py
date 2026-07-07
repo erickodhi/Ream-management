@@ -656,17 +656,17 @@ def run_academic_promotion_process():
     cursor = conn.cursor()
     
     try:
-        # 1. Fetch all students using ONLY existing columns
+        # 1. Fetch ALL students currently in the table
         cursor.execute("SELECT adm_no, name, form FROM students")
         students = cursor.fetchall()
         
         if not students:
-            return "<h1>No Students Found</h1><p>There are no student records to promote.</p><p><a href='/admin'>Go Back</a></p>"
+            return "<h1>No Students Found</h1><p>There are no student records in the database at all.</p><p><a href='/admin'>Go Back</a></p>"
 
         promoted_count = 0
         graduated_count = 0
 
-        # 2. Update each student directly without touching 'year'
+        # 2. Update each student's Form directly
         for student in students:
             adm_no, name, current_form = student
             
@@ -689,9 +689,9 @@ def run_academic_promotion_process():
         
         return f"""
         <div style="font-family: sans-serif; padding: 20px;">
-            <h1 style="color: #16a34a; margin-bottom: 10px;">Promotion Complete!</h1>
-            <p style="font-size: 16px;"><strong>{promoted_count}</strong> students advanced (Form 1 &rarr; Form 2, Form 2 &rarr; Form 3, Form 3 &rarr; Form 4).</p>
-            <p style="font-size: 16px;"><strong>{graduated_count}</strong> Form 4 students marked as Graduated.</p>
+            <h1 style="color: #16a34a;">Promotion Complete!</h1>
+            <p style="font-size: 16px;"><strong>{promoted_count}</strong> students were successfully promoted to their next Form.</p>
+            <p style="font-size: 16px;"><strong>{graduated_count}</strong> Form 4 students were marked as Graduated.</p>
             <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
