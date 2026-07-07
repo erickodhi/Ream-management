@@ -672,82 +672,65 @@ import os
 import sqlite3
 
 @app.route('/admin/promote_students', methods=['POST'])
+@login_required
+@role_required(['Admin'])
 def run_academic_promotion_process():
-    import sqlite3
-    import os
-
-    db_path = os.path.join(app.root_path, 'database.db')
-    if not os.path.exists(db_path):
-        db_path = os.path.join(app.root_path, 'instance', 'database.db')
-
-    conn = sqlite3.connect(db_path)
+    conn = get_db_connection()
     cursor = conn.cursor()
 
     try:
-        from_year = 2026
-        to_year = 2027
+        to_year = "2027"
 
-        # 1. Ensure 'year' column exists
+        # 1. Detect grade vs form column name
         cursor.execute("PRAGMA table_info(students)")
         cols = [col[1] for col in cursor.fetchall()]
-        if 'year' not in cols:
-            cursor.execute("ALTER TABLE students ADD COLUMN year INTEGER DEFAULT 2026")
-            conn.commit()
+        form_col = 'grade' if 'grade' in cols else ('form' if 'form' in cols else 'grade')
 
-        # Detect form vs grade
-        form_col = 'form' if 'form' in cols else 'grade'
-
-        # 2. Get students in the current year (2026)
-        cursor.execute(f"SELECT adm_no, name, {form_col}, stream, gender FROM students WHERE year = ? OR year IS NULL", (from_year,))
+        # 2. Fetch ALL enrolled students
+        cursor.execute(f"SELECT adm_no, {form_col} FROM students")
         current_students = cursor.fetchall()
 
         if not current_students:
-            return f"<h1>No Records Found</h1><p>No students found for year {from_year} to promote.</p><p><a href='/admin'>Go Back</a></p>"
+            return f"<h1>No Records Found</h1><p>There are no students in the database to promote.</p><p><a href='/admin'>Go Back</a></p>"
 
         promoted_count = 0
 
-        for student in current_students:
-            adm_no, name, current_class, stream, gender = student
+        # 3. Advance each student's class and update their year to 2027
+        for adm_no, current_class in current_students:
             class_clean = str(current_class).strip().upper() if current_class else ""
 
-            # Determine new class
             if "1" in class_clean:
-                new_class = "Form 2" if form_col == 'form' else "Grade 2"
+                new_class = "Grade 2" if form_col == 'grade' else "Form 2"
             elif "2" in class_clean:
-                new_class = "Form 3" if form_col == 'form' else "Grade 3"
+                new_class = "Grade 3" if form_col == 'grade' else "Form 3"
             elif "3" in class_clean:
-                new_class = "Form 4" if form_col == 'form' else "Grade 4"
+                new_class = "Grade 4" if form_col == 'grade' else "Form 4"
             elif "4" in class_clean:
                 new_class = "Graduated"
             else:
                 new_class = current_class
 
-            # 3. Check if student is ALREADY promoted to 2027
-            cursor.execute("SELECT COUNT(*) FROM students WHERE adm_no = ? AND year = ?", (adm_no, to_year))
-            already_exists = cursor.fetchone()[0]
+            cursor.execute(f"""
+                UPDATE students 
+                SET {form_col} = ?, year = ? 
+                WHERE adm_no = ?
+            """, (new_class, to_year, adm_no))
 
-            if already_exists == 0:
-                # INSERT a new row for 2027 (keeps 2026 record intact!)
-                cursor.execute(f"""
-                    INSERT INTO students (adm_no, name, {form_col}, stream, gender, year)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                """, (adm_no, name, new_class, stream, gender, to_year))
-                promoted_count += 1
+            promoted_count += 1
 
         conn.commit()
 
         return f"""
         <div style="font-family: sans-serif; padding: 20px;">
-            <h1 style="color: #16a34a;">Promotion to {to_year} Complete!</h1>
-            <p><strong>{promoted_count}</strong> student records created for {to_year}.</p>
-            <p>Your {from_year} records remain preserved as they were.</p>
+            <h1 style="color: #16a34a;">Promotion Complete!</h1>
+            <p style="font-size: 16px;">Successfully promoted <strong>{promoted_count}</strong> students to <strong>{to_year}</strong>.</p>
             <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
 
     except Exception as e:
         conn.rollback()
-        return f"An error occurred during promotion: {str(e)}", 500
+        return f"An error occurred: {str(e)}", 500
     finally:
         conn.close()
 if __name__ == '__main__':
