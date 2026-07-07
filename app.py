@@ -685,7 +685,7 @@ def run_academic_promotion_process():
         form_col = 'grade' if 'grade' in cols else ('form' if 'form' in cols else 'grade')
 
         # 2. Fetch all current student records
-        cursor.execute(f"SELECT adm_no, name, {form_col}, stream, gender, year FROM students")
+        cursor.execute(f"SELECT adm_no, {form_col}, year FROM students")
         current_students = cursor.fetchall()
 
         if not current_students:
@@ -694,22 +694,15 @@ def run_academic_promotion_process():
         promoted_count = 0
 
         for student in current_students:
-            adm_no, name, current_class, stream, gender, raw_year = student
+            adm_no, current_class, raw_year = student
 
-            # Determine current and next year
+            # Determine next year (2026 -> 2027 -> 2028)
             try:
                 current_yr_int = int(str(raw_year).strip()) if raw_year else 2026
             except ValueError:
                 current_yr_int = 2026
 
             next_year = str(current_yr_int + 1)
-
-            # Ensure current year is saved on the existing record so past years remain viewable
-            cursor.execute(f"""
-                UPDATE students 
-                SET year = ? 
-                WHERE adm_no = ? AND (year IS NULL OR year = '')
-            """, (str(current_yr_int), adm_no))
 
             # Determine next class level
             class_clean = str(current_class).strip().upper() if current_class else ""
@@ -724,14 +717,12 @@ def run_academic_promotion_process():
             else:
                 new_class = current_class
 
-            # 3. Create a NEW row for the next year without altering or deleting the previous year's row
+            # 3. UPDATE existing record directly (bypasses UNIQUE constraint error)
             cursor.execute(f"""
-                INSERT INTO students (adm_no, name, {form_col}, stream, gender, year)
-                SELECT ?, ?, ?, ?, ?, ?
-                WHERE NOT EXISTS (
-                    SELECT 1 FROM students WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?
-                )
-            """, (adm_no, name, new_class, stream, gender, next_year, adm_no, next_year))
+                UPDATE students 
+                SET {form_col} = ?, year = ? 
+                WHERE adm_no = ?
+            """, (new_class, next_year, adm_no))
 
             promoted_count += 1
 
@@ -740,7 +731,7 @@ def run_academic_promotion_process():
         return f"""
         <div style="font-family: sans-serif; padding: 20px;">
             <h1 style="color: #16a34a;">Promotion Complete!</h1>
-            <p style="font-size: 16px;">Successfully created <strong>{next_year}</strong> records for <strong>{promoted_count}</strong> students while retaining all previous records.</p>
+            <p style="font-size: 16px;">Successfully promoted <strong>{promoted_count}</strong> students to <strong>{next_year}</strong>.</p>
             <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
