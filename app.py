@@ -202,26 +202,34 @@ def home():
 def admin_dashboard():
     conn = get_db_connection()
     
-    # 1. Determine active default year
+    # 1. Get current default year from config
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     default_year = str(config['current_year']) if (config and 'current_year' in config.keys()) else '2026'
     selected_year = str(request.args.get('year', default_year))
 
-    # 2. Fetch student records for the selected year
+    # 2. Fetch raw student rows for the selected year
     raw_students = conn.execute("""
         SELECT * FROM students 
         WHERE TRIM(CAST(year AS TEXT)) = ? OR year IS NULL OR year = ''
     """, (selected_year,)).fetchall()
 
-    # 3. Enrich each student record with ream statements and account status ("Pending")
     enriched_students = []
     has_ream_table = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ream_records'").fetchone()
 
     for s in raw_students:
         s_dict = dict(s)
-        adm = s_dict['adm_no']
+        adm = s_dict.get('adm_no')
 
-        # Attach Ream Statement
+        # Map and set status properties so admin.html catches whatever variable it expects
+        raw_status = s_dict.get('status') or s_dict.get('payment_status') or s_dict.get('account_status') or s_dict.get('account_summary')
+        status_text = str(raw_status).strip() if raw_status else "Pending"
+
+        s_dict['status'] = status_text
+        s_dict['payment_status'] = status_text
+        s_dict['account_status'] = status_text
+        s_dict['account_summary'] = status_text
+
+        # Map and set ream statement details
         if has_ream_table:
             ream_row = conn.execute("""
                 SELECT reams_brought, reams_owed FROM ream_records 
@@ -232,11 +240,7 @@ def admin_dashboard():
                 owed = ream_row['reams_owed']
                 s_dict['reams_owed'] = f"{owed} ream(s) owed" if owed > 0 else "Clear"
             else:
-                owed = s_dict.get('reams_owed', 0)
-                if isinstance(owed, int) or (isinstance(owed, str) and str(owed).isdigit()):
-                    s_dict['reams_owed'] = f"{int(owed)} ream(s) owed" if int(owed) > 0 else "Clear"
-                else:
-                    s_dict['reams_owed'] = owed if owed else "Clear"
+                s_dict['reams_owed'] = "Clear"
         else:
             owed = s_dict.get('reams_owed', 0)
             if isinstance(owed, int) or (isinstance(owed, str) and str(owed).isdigit()):
@@ -244,13 +248,9 @@ def admin_dashboard():
             else:
                 s_dict['reams_owed'] = owed if owed else "Clear"
 
-        # Attach Account Summary ("Pending" default badge)
-        if not s_dict.get('account_summary'):
-            s_dict['account_summary'] = 'Pending'
-
         enriched_students.append(s_dict)
 
-    # 4. Filter dropdown choices for grades/streams
+    # 3. Filter dropdown selections
     distinct_grades = conn.execute("""
         SELECT DISTINCT grade FROM students 
         WHERE TRIM(CAST(year AS TEXT)) = ? ORDER BY grade
