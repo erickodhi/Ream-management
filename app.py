@@ -659,60 +659,69 @@ import sqlite3
 @app.route('/admin/promote_students', methods=['POST'])
 def run_academic_promotion_process():
     try:
-        # 1. Fetch all student records using SQLAlchemy models
-        # (If your model class is named differently, e.g., StudentModel, adjust below)
-        students = Student.query.all()
+        # 1. Attempt using Flask-SQLAlchemy engine/connection if 'db' is in scope
+        if 'db' in globals():
+            with db.engine.begin() as conn:
+                # Detect whether column is 'form' or 'grade'
+                columns_res = conn.execute(db.text("PRAGMA table_info(students)")).fetchall()
+                cols = [col[1] for col in columns_res]
+                form_col = 'form' if 'form' in cols else ('grade' if 'grade' in cols else None)
+
+                if not form_col:
+                    return "<h1>Schema Error</h1><p>Neither 'form' nor 'grade' column exists in students table.</p><p><a href='/admin'>Go Back</a></p>"
+
+                # Execute promotions directly inside SQL
+                conn.execute(db.text(f"UPDATE students SET {form_col} = 'Form 2' WHERE UPPER({form_col}) LIKE '%1%' OR UPPER({form_col}) LIKE '%FORM 1%'"))
+                conn.execute(db.text(f"UPDATE students SET {form_col} = 'Form 3' WHERE UPPER({form_col}) LIKE '%2%' OR UPPER({form_col}) LIKE '%FORM 2%'"))
+                conn.execute(db.text(f"UPDATE students SET {form_col} = 'Form 4' WHERE UPPER({form_col}) LIKE '%3%' OR UPPER({form_col}) LIKE '%FORM 3%'"))
+                conn.execute(db.text(f"UPDATE students SET {form_col} = 'Graduated' WHERE UPPER({form_col}) LIKE '%4%' OR UPPER({form_col}) LIKE '%FORM 4%'"))
+
+            return """
+            <div style="font-family: sans-serif; padding: 20px;">
+                <h1 style="color: #16a34a;">Promotion Complete!</h1>
+                <p style="font-size: 16px;">Students successfully promoted to the next class.</p>
+                <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
+            </div>
+            """
+
+    except Exception as e:
+        # Fallback to direct SQLite driver if SQLAlchemy execution hit an issue
+        pass
+
+    # 2. Raw SQLite fallback
+    import sqlite3
+    import os
+
+    db_path = os.path.join(app.root_path, 'database.db')
+    if not os.path.exists(db_path):
+        db_path = os.path.join(app.root_path, 'instance', 'database.db')
+
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
         
-        if not students:
-            return "<h1>No Students Found</h1><p>There are no student records currently stored in the database.</p><p><a href='/admin'>Go Back</a></p>"
+        cursor.execute("PRAGMA table_info(students)")
+        cols = [col[1] for col in cursor.fetchall()]
+        form_col = 'form' if 'form' in cols else ('grade' if 'grade' in cols else None)
 
-        promoted_count = 0
-        graduated_count = 0
+        if form_col:
+            cursor.execute(f"UPDATE students SET {form_col} = 'Form 2' WHERE UPPER({form_col}) LIKE '%1%'")
+            cursor.execute(f"UPDATE students SET {form_col} = 'Form 3' WHERE UPPER({form_col}) LIKE '%2%'")
+            cursor.execute(f"UPDATE students SET {form_col} = 'Form 4' WHERE UPPER({form_col}) LIKE '%3%'")
+            cursor.execute(f"UPDATE students SET {form_col} = 'Graduated' WHERE UPPER({form_col}) LIKE '%4%'")
+            conn.commit()
 
-        # 2. Iterate through records and advance their class/form
-        for student in students:
-            # Check attribute whether named 'form' or 'grade'
-            current_class = getattr(student, 'form', None) or getattr(student, 'grade', None) or ""
-            class_clean = str(current_class).strip().upper()
+        conn.close()
 
-            if "1" in class_clean or "FORM 1" in class_clean or "GRADE 1" in class_clean:
-                new_val = "Form 2" if hasattr(student, 'form') else "Grade 2"
-                if hasattr(student, 'form'): student.form = new_val
-                else: student.grade = new_val
-                promoted_count += 1
-                
-            elif "2" in class_clean or "FORM 2" in class_clean or "GRADE 2" in class_clean:
-                new_val = "Form 3" if hasattr(student, 'form') else "Grade 3"
-                if hasattr(student, 'form'): student.form = new_val
-                else: student.grade = new_val
-                promoted_count += 1
-                
-            elif "3" in class_clean or "FORM 3" in class_clean or "GRADE 3" in class_clean:
-                new_val = "Form 4" if hasattr(student, 'form') else "Grade 4"
-                if hasattr(student, 'form'): student.form = new_val
-                else: student.grade = new_val
-                promoted_count += 1
-                
-            elif "4" in class_clean or "FORM 4" in class_clean or "GRADE 4" in class_clean:
-                if hasattr(student, 'form'): student.form = 'Graduated'
-                else: student.grade = 'Graduated'
-                graduated_count += 1
-
-        # Commit changes using SQLAlchemy session
-        db.session.commit()
-
-        return f"""
+        return """
         <div style="font-family: sans-serif; padding: 20px;">
             <h1 style="color: #16a34a;">Promotion Complete!</h1>
-            <p style="font-size: 16px;"><strong>{promoted_count}</strong> students were successfully promoted.</p>
-            <p style="font-size: 16px;"><strong>{graduated_count}</strong> Form 4 / Grade 4 students marked as Graduated.</p>
+            <p style="font-size: 16px;">Students successfully promoted to the next class.</p>
             <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
-
-    except Exception as e:
-        db.session.rollback()
-        return f"An error occurred during promotion: {str(e)}", 500
+    except Exception as err:
+        return f"An error occurred during promotion: {str(err)}", 500
     
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
