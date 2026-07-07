@@ -650,22 +650,23 @@ def debug_db():
 import os
 import sqlite3
 
+import os
+import sqlite3
+
 @app.route('/admin/promote_students', methods=['POST'])
 def run_academic_promotion_process():
-    # Detect absolute path to instance/database.db, database.db, or ream_management.db
     base_dir = os.path.abspath(os.path.dirname(__file__))
     
     possible_paths = [
-        os.path.join(base_dir, 'instance', 'database.db'),
         os.path.join(base_dir, 'instance', 'ream_management.db'),
-        os.path.join(base_dir, 'database.db'),
-        os.path.join(base_dir, 'ream_management.db')
+        os.path.join(base_dir, 'instance', 'database.db'),
+        os.path.join(base_dir, 'ream_management.db'),
+        os.path.join(base_dir, 'database.db')
     ]
     
     db_file = None
     for path in possible_paths:
         if os.path.exists(path):
-            # Check if this database actually has student records
             try:
                 test_conn = sqlite3.connect(path)
                 count = test_conn.cursor().execute("SELECT COUNT(*) FROM students").fetchone()[0]
@@ -683,27 +684,40 @@ def run_academic_promotion_process():
     cursor = conn.cursor()
     
     try:
-        cursor.execute("SELECT adm_no, name, form FROM students")
+        # Check table columns to detect whether it uses 'form' or 'grade'
+        cursor.execute("PRAGMA table_info(students)")
+        columns = [col[1] for col in cursor.fetchall()]
+        
+        form_col = "form" if "form" in columns else ("grade" if "grade" in columns else None)
+        
+        if not form_col:
+            return "<h1>Schema Error</h1><p>Could not find a 'form' or 'grade' column in the students table.</p><p><a href='/admin'>Go Back</a></p>"
+
+        # Fetch students using the dynamically detected column name
+        cursor.execute(f"SELECT adm_no, name, {form_col} FROM students")
         students = cursor.fetchall()
 
         promoted_count = 0
         graduated_count = 0
 
         for student in students:
-            adm_no, name, current_form = student
-            form_clean = str(current_form).strip().upper() if current_form else ""
+            adm_no, name, current_class = student
+            class_clean = str(current_class).strip().upper() if current_class else ""
             
-            if "1" in form_clean or "FORM 1" in form_clean:
-                cursor.execute("UPDATE students SET form = 'Form 2' WHERE adm_no = ?", (adm_no,))
+            if "1" in class_clean or "FORM 1" in class_clean or "GRADE 1" in class_clean:
+                new_val = "Form 2" if form_col == "form" else "Grade 2"
+                cursor.execute(f"UPDATE students SET {form_col} = ? WHERE adm_no = ?", (new_val, adm_no))
                 promoted_count += 1
-            elif "2" in form_clean or "FORM 2" in form_clean:
-                cursor.execute("UPDATE students SET form = 'Form 3' WHERE adm_no = ?", (adm_no,))
+            elif "2" in class_clean or "FORM 2" in class_clean or "GRADE 2" in class_clean:
+                new_val = "Form 3" if form_col == "form" else "Grade 3"
+                cursor.execute(f"UPDATE students SET {form_col} = ? WHERE adm_no = ?", (new_val, adm_no))
                 promoted_count += 1
-            elif "3" in form_clean or "FORM 3" in form_clean:
-                cursor.execute("UPDATE students SET form = 'Form 4' WHERE adm_no = ?", (adm_no,))
+            elif "3" in class_clean or "FORM 3" in class_clean or "GRADE 3" in class_clean:
+                new_val = "Form 4" if form_col == "form" else "Grade 4"
+                cursor.execute(f"UPDATE students SET {form_col} = ? WHERE adm_no = ?", (new_val, adm_no))
                 promoted_count += 1
-            elif "4" in form_clean or "FORM 4" in form_clean:
-                cursor.execute("UPDATE students SET form = 'Graduated' WHERE adm_no = ?", (adm_no,))
+            elif "4" in class_clean or "FORM 4" in class_clean or "GRADE 4" in class_clean:
+                cursor.execute(f"UPDATE students SET {form_col} = 'Graduated' WHERE adm_no = ?", (adm_no,))
                 graduated_count += 1
 
         conn.commit()
@@ -711,9 +725,8 @@ def run_academic_promotion_process():
         return f"""
         <div style="font-family: sans-serif; padding: 20px;">
             <h1 style="color: #16a34a;">Promotion Complete!</h1>
-            <p style="font-size: 16px;">Successfully updated <strong>{db_file}</strong>.</p>
-            <p style="font-size: 16px;"><strong>{promoted_count}</strong> students promoted (Form 1 &rarr; 2, Form 2 &rarr; 3, Form 3 &rarr; 4).</p>
-            <p style="font-size: 16px;"><strong>{graduated_count}</strong> Form 4 students marked as Graduated.</p>
+            <p style="font-size: 16px;"><strong>{promoted_count}</strong> students were successfully promoted.</p>
+            <p style="font-size: 16px;"><strong>{graduated_count}</strong> Form 4 / Grade 4 students were marked as Graduated.</p>
             <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
