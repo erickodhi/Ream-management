@@ -656,59 +656,43 @@ def run_academic_promotion_process():
     cursor = conn.cursor()
     
     try:
-        last_year = 2025
-        current_year = 2026
+        # 1. Fetch all students using ONLY existing columns
+        cursor.execute("SELECT adm_no, name, form FROM students")
+        students = cursor.fetchall()
         
-        # 1. Fetch 2025 students using the correct column 'form'
-        cursor.execute("SELECT adm_no, name, form, stream, gender FROM students WHERE year = ?", (last_year,))
-        last_year_students = cursor.fetchall()
-        
-        if not last_year_students:
-            return f"<h1>No Students Found</h1><p>No student records found for the year {last_year} to promote.</p><p><a href='/admin'>Go Back</a></p>"
+        if not students:
+            return "<h1>No Students Found</h1><p>There are no student records to promote.</p><p><a href='/admin'>Go Back</a></p>"
 
         promoted_count = 0
-        skipped_count = 0
+        graduated_count = 0
 
-        for student in last_year_students:
-            adm_no, name, current_form, stream, gender = student
+        # 2. Update each student directly without touching 'year'
+        for student in students:
+            adm_no, name, current_form = student
             
-            # 2. Check if student already exists in 2026
-            cursor.execute("SELECT COUNT(*) FROM students WHERE adm_no = ? AND year = ?", (adm_no, current_year))
-            already_exists = cursor.fetchone()[0] > 0
-            
-            if already_exists:
-                skipped_count += 1
-                continue
-
-            # 3. Form Promotion Logic
             form_clean = str(current_form).strip().upper() if current_form else ""
-            if "1" in form_clean or "FORM 1" in form_clean:
-                new_form = "Form 2"
-            elif "2" in form_clean or "FORM 2" in form_clean:
-                new_form = "Form 3"
-            elif "3" in form_clean or "FORM 3" in form_clean:
-                new_form = "Form 4"
-            elif "4" in form_clean or "FORM 4" in form_clean:
-                # Graduated Form 4s are not added to 2026
-                continue
-            else:
-                new_form = current_form
-
-            # 4. Insert promoted student for 2026
-            cursor.execute("""
-                INSERT INTO students (adm_no, name, form, stream, gender, term1, term2, term3, summary_status, year)
-                VALUES (?, ?, ?, ?, ?, '', '', '', 'Pending', ?)
-            """, (adm_no, name, new_form, stream, gender, current_year))
-            promoted_count += 1
             
+            if "1" in form_clean or "FORM 1" in form_clean:
+                cursor.execute("UPDATE students SET form = 'Form 2' WHERE adm_no = ?", (adm_no,))
+                promoted_count += 1
+            elif "2" in form_clean or "FORM 2" in form_clean:
+                cursor.execute("UPDATE students SET form = 'Form 3' WHERE adm_no = ?", (adm_no,))
+                promoted_count += 1
+            elif "3" in form_clean or "FORM 3" in form_clean:
+                cursor.execute("UPDATE students SET form = 'Form 4' WHERE adm_no = ?", (adm_no,))
+                promoted_count += 1
+            elif "4" in form_clean or "FORM 4" in form_clean:
+                cursor.execute("UPDATE students SET form = 'Graduated' WHERE adm_no = ?", (adm_no,))
+                graduated_count += 1
+
         conn.commit()
         
         return f"""
         <div style="font-family: sans-serif; padding: 20px;">
-            <h1 style="color: #16a34a;">Promotion Complete!</h1>
-            <p><strong>{promoted_count}</strong> students were successfully promoted from {last_year} to {current_year}.</p>
-            <p><strong>{skipped_count}</strong> students were already registered in {current_year} and skipped safely.</p>
-            <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px;">Return to Admin Dashboard</a>
+            <h1 style="color: #16a34a; margin-bottom: 10px;">Promotion Complete!</h1>
+            <p style="font-size: 16px;"><strong>{promoted_count}</strong> students advanced (Form 1 &rarr; Form 2, Form 2 &rarr; Form 3, Form 3 &rarr; Form 4).</p>
+            <p style="font-size: 16px;"><strong>{graduated_count}</strong> Form 4 students marked as Graduated.</p>
+            <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
 
