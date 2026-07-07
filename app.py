@@ -201,21 +201,36 @@ def home():
 @role_required(['Admin'])
 def admin_dashboard():
     conn = get_db_connection()
-    config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
-    students = conn.execute('SELECT * FROM students').fetchall()
-    distinct_grades = conn.execute('SELECT DISTINCT grade FROM students ORDER BY grade').fetchall()
     
-    # This fetches your unique stream list from the database
-    distinct_streams = conn.execute("SELECT DISTINCT stream FROM students WHERE stream IS NOT NULL AND stream != '' ORDER BY stream").fetchall()
+    # 1. Fetch system config (for active year default)
+    config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
+    
+    # Fallback default year if config is empty or missing 'current_year'
+    default_year = config['current_year'] if (config and 'current_year' in config.keys()) else 2026
+    
+    # 2. Get the year selected by the user from URL parameter (e.g., /admin?year=2026)
+    selected_year = request.args.get('year', default_year, type=int)
+    
+    # 3. Ensure any existing unassigned records default to 2026 so they don't disappear
+    conn.execute("UPDATE students SET year = 2026 WHERE year IS NULL OR year = ''")
+    conn.commit()
+
+    # 4. Fetch ONLY students matching the selected year!
+    students = conn.execute('SELECT * FROM students WHERE year = ?', (selected_year,)).fetchall()
+    
+    # 5. Fetch distinct grades and streams for dropdown filters
+    distinct_grades = conn.execute('SELECT DISTINCT grade FROM students WHERE year = ? ORDER BY grade', (selected_year,)).fetchall()
+    distinct_streams = conn.execute("SELECT DISTINCT stream FROM students WHERE stream IS NOT NULL AND stream != '' AND year = ? ORDER BY stream", (selected_year,)).fetchall()
     
     conn.close()
     
-    # This sends everything to your HTML dashboard template
+    # Send everything including selected_year to admin.html
     return render_template('admin.html', 
                            config=config, 
                            students=students, 
                            distinct_grades=distinct_grades, 
-                           distinct_streams=distinct_streams)
+                           distinct_streams=distinct_streams,
+                           selected_year=selected_year)
 
 @app.route('/admin/report')
 def generate_report():
@@ -658,37 +673,6 @@ import sqlite3
 
 @app.route('/admin/promote_students', methods=['POST'])
 def run_academic_promotion_process():
-    try:
-        # 1. Attempt using Flask-SQLAlchemy engine/connection if 'db' is in scope
-        if 'db' in globals():
-            with db.engine.begin() as conn:
-                # Detect whether column is 'form' or 'grade'
-                columns_res = conn.execute(db.text("PRAGMA table_info(students)")).fetchall()
-                cols = [col[1] for col in columns_res]
-                form_col = 'form' if 'form' in cols else ('grade' if 'grade' in cols else None)
-
-                if not form_col:
-                    return "<h1>Schema Error</h1><p>Neither 'form' nor 'grade' column exists in students table.</p><p><a href='/admin'>Go Back</a></p>"
-
-                # Execute promotions directly inside SQL
-                conn.execute(db.text(f"UPDATE students SET {form_col} = 'Form 2' WHERE UPPER({form_col}) LIKE '%1%' OR UPPER({form_col}) LIKE '%FORM 1%'"))
-                conn.execute(db.text(f"UPDATE students SET {form_col} = 'Form 3' WHERE UPPER({form_col}) LIKE '%2%' OR UPPER({form_col}) LIKE '%FORM 2%'"))
-                conn.execute(db.text(f"UPDATE students SET {form_col} = 'Form 4' WHERE UPPER({form_col}) LIKE '%3%' OR UPPER({form_col}) LIKE '%FORM 3%'"))
-                conn.execute(db.text(f"UPDATE students SET {form_col} = 'Graduated' WHERE UPPER({form_col}) LIKE '%4%' OR UPPER({form_col}) LIKE '%FORM 4%'"))
-
-            return """
-            <div style="font-family: sans-serif; padding: 20px;">
-                <h1 style="color: #16a34a;">Promotion Complete!</h1>
-                <p style="font-size: 16px;">Students successfully promoted to the next class.</p>
-                <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
-            </div>
-            """
-
-    except Exception as e:
-        # Fallback to direct SQLite driver if SQLAlchemy execution hit an issue
-        pass
-
-    # 2. Raw SQLite fallback
     import sqlite3
     import os
 
@@ -696,32 +680,75 @@ def run_academic_promotion_process():
     if not os.path.exists(db_path):
         db_path = os.path.join(app.root_path, 'instance', 'database.db')
 
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-        
+        from_year = 2026
+        to_year = 2027
+
+        # 1. Ensure 'year' column exists
         cursor.execute("PRAGMA table_info(students)")
         cols = [col[1] for col in cursor.fetchall()]
-        form_col = 'form' if 'form' in cols else ('grade' if 'grade' in cols else None)
-
-        if form_col:
-            cursor.execute(f"UPDATE students SET {form_col} = 'Form 2' WHERE UPPER({form_col}) LIKE '%1%'")
-            cursor.execute(f"UPDATE students SET {form_col} = 'Form 3' WHERE UPPER({form_col}) LIKE '%2%'")
-            cursor.execute(f"UPDATE students SET {form_col} = 'Form 4' WHERE UPPER({form_col}) LIKE '%3%'")
-            cursor.execute(f"UPDATE students SET {form_col} = 'Graduated' WHERE UPPER({form_col}) LIKE '%4%'")
+        if 'year' not in cols:
+            cursor.execute("ALTER TABLE students ADD COLUMN year INTEGER DEFAULT 2026")
             conn.commit()
 
-        conn.close()
+        # Detect form vs grade
+        form_col = 'form' if 'form' in cols else 'grade'
 
-        return """
+        # 2. Get students in the current year (2026)
+        cursor.execute(f"SELECT adm_no, name, {form_col}, stream, gender FROM students WHERE year = ? OR year IS NULL", (from_year,))
+        current_students = cursor.fetchall()
+
+        if not current_students:
+            return f"<h1>No Records Found</h1><p>No students found for year {from_year} to promote.</p><p><a href='/admin'>Go Back</a></p>"
+
+        promoted_count = 0
+
+        for student in current_students:
+            adm_no, name, current_class, stream, gender = student
+            class_clean = str(current_class).strip().upper() if current_class else ""
+
+            # Determine new class
+            if "1" in class_clean:
+                new_class = "Form 2" if form_col == 'form' else "Grade 2"
+            elif "2" in class_clean:
+                new_class = "Form 3" if form_col == 'form' else "Grade 3"
+            elif "3" in class_clean:
+                new_class = "Form 4" if form_col == 'form' else "Grade 4"
+            elif "4" in class_clean:
+                new_class = "Graduated"
+            else:
+                new_class = current_class
+
+            # 3. Check if student is ALREADY promoted to 2027
+            cursor.execute("SELECT COUNT(*) FROM students WHERE adm_no = ? AND year = ?", (adm_no, to_year))
+            already_exists = cursor.fetchone()[0]
+
+            if already_exists == 0:
+                # INSERT a new row for 2027 (keeps 2026 record intact!)
+                cursor.execute(f"""
+                    INSERT INTO students (adm_no, name, {form_col}, stream, gender, year)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                """, (adm_no, name, new_class, stream, gender, to_year))
+                promoted_count += 1
+
+        conn.commit()
+
+        return f"""
         <div style="font-family: sans-serif; padding: 20px;">
-            <h1 style="color: #16a34a;">Promotion Complete!</h1>
-            <p style="font-size: 16px;">Students successfully promoted to the next class.</p>
+            <h1 style="color: #16a34a;">Promotion to {to_year} Complete!</h1>
+            <p><strong>{promoted_count}</strong> student records created for {to_year}.</p>
+            <p>Your {from_year} records remain preserved as they were.</p>
             <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
-    except Exception as err:
-        return f"An error occurred during promotion: {str(err)}", 500
-    
+
+    except Exception as e:
+        conn.rollback()
+        return f"An error occurred during promotion: {str(e)}", 500
+    finally:
+        conn.close()
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
