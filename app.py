@@ -651,23 +651,29 @@ def upload_students():
     return redirect(url_for('admin_dashboard'))
 
 @app.route('/admin/clear_students', methods=['POST'])
+@login_required
+@role_required(['Admin'])
 def clear_students():
     conn = get_db_connection()
     try:
-        # Deletes all records from the students table
-        conn.execute("DELETE FROM students")
-        
-        # Optional: Resets the SQLite auto-increment counter back to 1
-        conn.execute("DELETE FROM sqlite_sequence WHERE name='students'")
-        
-        conn.commit()
-        flash("💥 All student records have been permanently cleared from the system!")
+        # 1. Get the specific year to clear from the submitted form
+        target_year = request.form.get('year')
+
+        if target_year:
+            # Delete records strictly for that specific academic year
+            conn.execute("DELETE FROM students WHERE TRIM(CAST(year AS TEXT)) = ?", (str(target_year),))
+            conn.commit()
+            flash(f"Cleared student records for academic year {target_year}.")
+        else:
+            flash("No target year specified for clearing.")
+
     except Exception as e:
+        conn.rollback()
         flash(f"Error clearing records: {str(e)}")
     finally:
         conn.close()
-    return redirect(url_for('admin_dashboard'))
 
+    return redirect(url_for('admin_dashboard'))
 @app.route('/debug-db')
 def debug_db():
     try:
