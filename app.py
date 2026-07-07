@@ -651,7 +651,8 @@ def debug_db():
 def run_academic_promotion_process():
     import sqlite3
     
-    db_file = 'ream_management.db' 
+    # Updated to point to your active database file
+    db_file = 'database.db' 
     conn = sqlite3.connect(db_file)
     cursor = conn.cursor()
     
