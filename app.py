@@ -202,12 +202,12 @@ def home():
 def admin_dashboard():
     conn = get_db_connection()
     
-    # 1. Get current default year from config
+    # Get active filter year
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     default_year = str(config['current_year']) if (config and 'current_year' in config.keys()) else '2026'
     selected_year = str(request.args.get('year', default_year))
 
-    # 2. Fetch raw student rows for the selected year
+    # Fetch raw students for selected year
     raw_students = conn.execute("""
         SELECT * FROM students 
         WHERE TRIM(CAST(year AS TEXT)) = ? OR year IS NULL OR year = ''
@@ -220,7 +220,7 @@ def admin_dashboard():
         s_dict = dict(s)
         adm = s_dict.get('adm_no')
 
-        # Map and set status properties so admin.html catches whatever variable it expects
+        # 1. Attach Status ("Pending" by default)
         raw_status = s_dict.get('status') or s_dict.get('payment_status') or s_dict.get('account_status') or s_dict.get('account_summary')
         status_text = str(raw_status).strip() if raw_status else "Pending"
 
@@ -229,7 +229,7 @@ def admin_dashboard():
         s_dict['account_status'] = status_text
         s_dict['account_summary'] = status_text
 
-        # Map and set ream statement details
+        # 2. Attach Ream Statement
         if has_ream_table:
             ream_row = conn.execute("""
                 SELECT reams_brought, reams_owed FROM ream_records 
@@ -240,17 +240,13 @@ def admin_dashboard():
                 owed = ream_row['reams_owed']
                 s_dict['reams_owed'] = f"{owed} ream(s) owed" if owed > 0 else "Clear"
             else:
-                s_dict['reams_owed'] = "Clear"
+                s_dict['reams_owed'] = "1 ream(s) owed"
         else:
-            owed = s_dict.get('reams_owed', 0)
-            if isinstance(owed, int) or (isinstance(owed, str) and str(owed).isdigit()):
-                s_dict['reams_owed'] = f"{int(owed)} ream(s) owed" if int(owed) > 0 else "Clear"
-            else:
-                s_dict['reams_owed'] = owed if owed else "Clear"
+            s_dict['reams_owed'] = "Clear"
 
         enriched_students.append(s_dict)
 
-    # 3. Filter dropdown selections
+    # Filter dropdown options
     distinct_grades = conn.execute("""
         SELECT DISTINCT grade FROM students 
         WHERE TRIM(CAST(year AS TEXT)) = ? ORDER BY grade
@@ -721,37 +717,12 @@ def run_academic_promotion_process():
         cols = [col[1] for col in cursor.fetchall()]
         form_col = 'grade' if 'grade' in cols else ('form' if 'form' in cols else 'grade')
 
-        # 2. Rebuild table with composite primary key (adm_no, year) if not done already
-        cursor.execute("PRAGMA table_info(students)")
-        pk_cols = [row[1] for row in cursor.fetchall() if row[5] > 0]
-
-        if len(pk_cols) == 1 and pk_cols[0] == 'adm_no':
-            cursor.execute("ALTER TABLE students RENAME TO students_old")
-            cursor.execute(f"""
-                CREATE TABLE students (
-                    adm_no TEXT,
-                    name TEXT,
-                    {form_col} TEXT,
-                    stream TEXT,
-                    gender TEXT,
-                    year TEXT,
-                    PRIMARY KEY (adm_no, year)
-                )
-            """)
-            cursor.execute(f"""
-                INSERT OR IGNORE INTO students (adm_no, name, {form_col}, stream, gender, year)
-                SELECT adm_no, name, {form_col}, stream, gender, COALESCE(NULLIF(year, ''), '2026') 
-                FROM students_old
-            """)
-            cursor.execute("DROP TABLE students_old")
-            conn.commit()
-
-        # 3. Find the maximum existing year in the database (e.g., '2026')
+        # 2. Get current maximum year in database
         max_year_row = cursor.execute("SELECT MAX(CAST(year AS INTEGER)) FROM students WHERE year IS NOT NULL AND year != ''").fetchone()
         current_max_year = max_year_row[0] if (max_year_row and max_year_row[0]) else 2026
         target_year = str(current_max_year + 1)
 
-        # 4. Fetch students strictly from the latest active year
+        # 3. Fetch active students from current latest year
         cursor.execute(f"""
             SELECT adm_no, name, {form_col}, stream, gender 
             FROM students 
@@ -764,10 +735,12 @@ def run_academic_promotion_process():
 
         promoted_count = 0
 
-        # 5. Insert new promoted copies into the target next year
+        # Check if secondary tables exist
+        has_ream_table = cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ream_records'").fetchone()
+
         for adm_no, name, current_class, stream, gender in latest_students:
+            # Advance class
             class_clean = str(current_class).strip().upper() if current_class else ""
-            
             if "1" in class_clean:
                 new_class = "Grade 2" if form_col == 'grade' else "Form 2"
             elif "2" in class_clean:
@@ -779,11 +752,26 @@ def run_academic_promotion_process():
             else:
                 new_class = current_class
 
-            # Insert the new year row (will ignore if already exists)
+            # A. Insert promoted record into students table
             cursor.execute(f"""
                 INSERT OR REPLACE INTO students (adm_no, name, {form_col}, stream, gender, year)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (adm_no, name, new_class, stream, gender, target_year))
+
+            # B. Carry over / initialize ream record for the new year
+            if has_ream_table:
+                # Check previous year's ream record
+                prev_ream = cursor.execute("""
+                    SELECT reams_brought, reams_owed FROM ream_records 
+                    WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?
+                """, (adm_no, str(current_max_year))).fetchone()
+                
+                owed = prev_ream['reams_owed'] if prev_ream else 1
+                
+                cursor.execute("""
+                    INSERT OR REPLACE INTO ream_records (adm_no, year, reams_brought, reams_owed)
+                    VALUES (?, ?, 0, ?)
+                """, (adm_no, target_year, owed))
 
             promoted_count += 1
 
@@ -793,14 +781,14 @@ def run_academic_promotion_process():
         <div style="font-family: sans-serif; padding: 20px;">
             <h1 style="color: #16a34a;">Promotion Complete!</h1>
             <p style="font-size: 16px;">Successfully promoted <strong>{promoted_count}</strong> students from <strong>{current_max_year}</strong> to <strong>{target_year}</strong>.</p>
-            <p style="font-size: 14px; color: #4b5563;">Previous year ({current_max_year}) records remain viewable in your dropdown filter.</p>
+            <p style="font-size: 14px; color: #4b5563;">Previous year ({current_max_year}) records and statements remain fully viewable in your dashboard filter.</p>
             <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
         </div>
         """
 
     except Exception as e:
         conn.rollback()
-        return f"An error occurred: {str(e)}", 500
+        return f"An error occurred during promotion: {str(e)}", 500
     finally:
         conn.close()
 if __name__ == '__main__':
