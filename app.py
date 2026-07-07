@@ -202,36 +202,73 @@ def home():
 def admin_dashboard():
     conn = get_db_connection()
     
-    # 1. Fetch system config (for active year default)
+    # 1. Determine active default year
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
-    
-    # Fallback default year if config is empty or missing 'current_year'
-    default_year = config['current_year'] if (config and 'current_year' in config.keys()) else 2026
-    
-    # 2. Get the year selected by the user from URL parameter (e.g., /admin?year=2026)
-    selected_year = request.args.get('year', default_year, type=int)
-    
-    # 3. Ensure any existing unassigned records default to 2026 so they don't disappear
-    conn.execute("UPDATE students SET year = 2026 WHERE year IS NULL OR year = ''")
-    conn.commit()
+    default_year = str(config['current_year']) if (config and 'current_year' in config.keys()) else '2026'
+    selected_year = str(request.args.get('year', default_year))
 
-    # 4. Fetch ONLY students matching the selected year!
-    students = conn.execute('SELECT * FROM students WHERE year = ?', (selected_year,)).fetchall()
-    
-    # 5. Fetch distinct grades and streams for dropdown filters
-    distinct_grades = conn.execute('SELECT DISTINCT grade FROM students WHERE year = ? ORDER BY grade', (selected_year,)).fetchall()
-    distinct_streams = conn.execute("SELECT DISTINCT stream FROM students WHERE stream IS NOT NULL AND stream != '' AND year = ? ORDER BY stream", (selected_year,)).fetchall()
-    
+    # 2. Fetch student records for the selected year
+    raw_students = conn.execute("""
+        SELECT * FROM students 
+        WHERE TRIM(CAST(year AS TEXT)) = ? OR year IS NULL OR year = ''
+    """, (selected_year,)).fetchall()
+
+    # 3. Enrich each student record with ream statements and account status ("Pending")
+    enriched_students = []
+    has_ream_table = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ream_records'").fetchone()
+
+    for s in raw_students:
+        s_dict = dict(s)
+        adm = s_dict['adm_no']
+
+        # Attach Ream Statement
+        if has_ream_table:
+            ream_row = conn.execute("""
+                SELECT reams_brought, reams_owed FROM ream_records 
+                WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?
+            """, (adm, selected_year)).fetchone()
+            
+            if ream_row:
+                owed = ream_row['reams_owed']
+                s_dict['reams_owed'] = f"{owed} ream(s) owed" if owed > 0 else "Clear"
+            else:
+                owed = s_dict.get('reams_owed', 0)
+                if isinstance(owed, int) or (isinstance(owed, str) and str(owed).isdigit()):
+                    s_dict['reams_owed'] = f"{int(owed)} ream(s) owed" if int(owed) > 0 else "Clear"
+                else:
+                    s_dict['reams_owed'] = owed if owed else "Clear"
+        else:
+            owed = s_dict.get('reams_owed', 0)
+            if isinstance(owed, int) or (isinstance(owed, str) and str(owed).isdigit()):
+                s_dict['reams_owed'] = f"{int(owed)} ream(s) owed" if int(owed) > 0 else "Clear"
+            else:
+                s_dict['reams_owed'] = owed if owed else "Clear"
+
+        # Attach Account Summary ("Pending" default badge)
+        if not s_dict.get('account_summary'):
+            s_dict['account_summary'] = 'Pending'
+
+        enriched_students.append(s_dict)
+
+    # 4. Filter dropdown choices for grades/streams
+    distinct_grades = conn.execute("""
+        SELECT DISTINCT grade FROM students 
+        WHERE TRIM(CAST(year AS TEXT)) = ? ORDER BY grade
+    """, (selected_year,)).fetchall()
+
+    distinct_streams = conn.execute("""
+        SELECT DISTINCT stream FROM students 
+        WHERE stream IS NOT NULL AND stream != '' AND TRIM(CAST(year AS TEXT)) = ? ORDER BY stream
+    """, (selected_year,)).fetchall()
+
     conn.close()
-    
-    # Send everything including selected_year to admin.html
+
     return render_template('admin.html', 
                            config=config, 
-                           students=students, 
+                           students=enriched_students, 
                            distinct_grades=distinct_grades, 
                            distinct_streams=distinct_streams,
                            selected_year=selected_year)
-
 @app.route('/admin/report')
 def generate_report():
     term_selected = request.args.get('term')
