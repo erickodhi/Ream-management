@@ -732,25 +732,20 @@ def promote_students():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 1. AUTO-DETECT: Find the highest active academic year currently in the DB
-        # This completely ignores form mismatch and targets the actual current batch!
+        # 1. Detect highest active year in the database
         max_year_row = cursor.execute("""
             SELECT MAX(CAST(year AS INTEGER)) 
             FROM students 
             WHERE grade != 'GRADUATED' AND year IS NOT NULL
         """).fetchone()
 
-        if max_year_row and max_year_row[0]:
-            current_year = max_year_row[0]
-        else:
-            current_year = 2026
-
+        current_year = max_year_row[0] if (max_year_row and max_year_row[0]) else 2026
         current_year_str = str(current_year)
         target_year_str = str(current_year + 1)
 
-        # 2. Fetch all active students in that highest year batch
+        # 2. Fetch active students in the current year
         current_students = cursor.execute("""
-            SELECT adm_no, grade 
+            SELECT adm_no, name, stream, gender, grade 
             FROM students 
             WHERE TRIM(CAST(year AS TEXT)) = ? AND (grade != 'GRADUATED' OR grade IS NULL)
         """, (current_year_str,)).fetchall()
@@ -763,14 +758,18 @@ def promote_students():
         promoted_count = 0
         graduated_count = 0
 
-        # 3. Perform the rollover
+        # 3. Duplicate student rows into the new year with promoted grades
         for student in current_students:
             adm_no = student['adm_no']
+            name = student['name'] if 'name' in student.keys() else ''
+            stream = student['stream'] if 'stream' in student.keys() else ''
+            gender = student['gender'] if 'gender' in student.keys() else ''
             current_grade = str(student['grade']).strip() if student['grade'] else ''
 
             next_grade = get_next_grade(current_grade)
 
             if next_grade == "GRADUATED":
+                # Mark current year record as graduated
                 cursor.execute("""
                     UPDATE students 
                     SET grade = 'GRADUATED'
@@ -778,19 +777,24 @@ def promote_students():
                 """, (adm_no, current_year_str))
                 graduated_count += 1
             else:
-                cursor.execute("""
-                    UPDATE students 
-                    SET grade = ?, year = ?
+                # Check if a record already exists for the target year to prevent duplicates
+                existing = cursor.execute("""
+                    SELECT adm_no FROM students 
                     WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?
-                """, (next_grade, target_year_str, adm_no, current_year_str))
-                promoted_count += 1
+                """, (adm_no, target_year_str)).fetchone()
+
+                if not existing:
+                    # INSERT a NEW row for the target year (preserves historical 2026 record!)
+                    cursor.execute("""
+                        INSERT INTO students (adm_no, name, stream, gender, grade, year)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                    """, (adm_no, name, stream, gender, next_grade, target_year_str))
+                    promoted_count += 1
 
         conn.commit()
         conn.close()
 
-        flash(f"Rollover Complete! Promoted: {promoted_count} | Graduated: {graduated_count} | Moved from Year {current_year_str} -> {target_year_str}")
-        
-        # Redirect to dashboard showing the newly created target year!
+        flash(f"Promotion Complete! Promoted: {promoted_count} | Graduated: {graduated_count} | 2026 records preserved and new {target_year_str} records created!")
         return redirect(url_for('admin_dashboard', selected_year=target_year_str))
 
     except Exception as e:
