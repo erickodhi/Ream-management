@@ -29,12 +29,19 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    conn = get_db_connection()
-    user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
-    conn.close()
-    if user:
-        return User(user['id'], user['username'], user['role'])
-    return None
+    conn = None
+    try:
+        conn = get_db_connection()
+        user = conn.execute('SELECT * FROM users WHERE id = ?', (user_id,)).fetchone()
+        if user:
+            return User(user['id'], user['username'], user['role'])
+        return None
+    except Exception as e:
+        print(f"Error in load_user: {e}")
+        return None
+    finally:
+        if conn:
+            conn.close()
 
 def role_required(allowed_roles):
     def decorator(f):
@@ -49,31 +56,9 @@ def role_required(allowed_roles):
     return decorator
 
 def get_db_connection():
-    conn = sqlite3.connect('ream_management.db')
+    conn = sqlite3.connect('ream_management.db', timeout=20)
     conn.row_factory = sqlite3.Row
-    
-    # Auto-create the users table if it's missing on the server
-    conn.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL
-        )
-    ''')
-    conn.commit()
-
-    # --- NEW: Automatically add the missing 'year' column safely ---
-    try:
-        conn.execute("ALTER TABLE students ADD COLUMN year INTEGER DEFAULT 2026")
-        conn.commit()
-        print("Successfully added 'year' column to students table!")
-    except sqlite3.OperationalError:
-        # If the column already exists, SQLite throws an error. 
-        # We catch it here and do nothing (pass) so the app keeps running.
-        pass
-    # -----------------------------------------------------------------
-
+    conn.execute('PRAGMA journal_mode=WAL;')
     return conn
 
 def get_next_grade(current_grade):
