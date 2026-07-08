@@ -377,28 +377,34 @@ def add_student():
 
 # ------------------ REAM TAKER DESK ------------------
 
-@app.route('/taker')
+@app.route('/taker', methods=['POST'])
 @login_required
 @role_required(['Taker', 'Admin'])
-def ream_taker_dashboard():
+def taker_submit():
     conn = get_db_connection()
-    config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     
-    active_year = "2026"
-    if config and config['current_year']:
-        active_year = str(config['current_year']).strip()
-    
-    students = conn.execute('''
-        SELECT * FROM students 
-        WHERE CAST(year AS INTEGER) = CAST(? AS INTEGER)
-    ''', (active_year,)).fetchall()
-    
+    adm_no = request.form.get('adm_no')
+    term = request.form.get('term')
+    status = request.form.get('status', 'Brought')
+    year = request.form.get('year')
+
+    # Fallback to system config year if form didn't pass year
+    if not year:
+        config = conn.execute('SELECT current_year FROM system_config LIMIT 1').fetchone()
+        year = str(config['current_year']) if (config and config['current_year']) else '2026'
+
+    # Update the term for this specific student and year
+    if term in ['term1', 'term2', 'term3']:
+        query = "UPDATE students SET " + term + " = ? WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?"
+        conn.execute(query, (status, adm_no, str(year)))
+
+    # Pass all 3 required arguments to update_student_summary!
+    update_student_summary(conn, adm_no, str(year))
+
+    conn.commit()
     conn.close()
     
-    # Restore this line so the normal website page loads!
-    #return render_template('ream_taker.html', config=config, students=students)!
-    #return f"DEBUG: Student 1 Year: {students[0]['year'] if len(students) > 0 else 'None'} | Student 2 Year: {students[1]['year'] if len(students) > 1 else 'None'}"!
-    return render_template('ream_taker.html', config=config, students=students)
+    return redirect('/taker')
     
 @app.route('/taker/submit/<adm_no>')
 @login_required
