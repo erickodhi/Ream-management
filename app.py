@@ -99,17 +99,19 @@ def init_db():
             current_year TEXT NOT NULL
         )''')
     conn.execute('''
-        CREATE TABLE IF NOT EXISTS students (
-            adm_no TEXT PRIMARY KEY,
-            name TEXT NOT NULL,
-            grade TEXT NOT NULL,
-            stream TEXT NOT NULL,
-            gender TEXT NOT NULL,
-            term1 TEXT DEFAULT 'Pending',
-            term2 TEXT DEFAULT 'Pending',
-            term3 TEXT DEFAULT 'Pending',
-            summary_status TEXT DEFAULT '3 Reams Owed'
-        )''')
+    CREATE TABLE IF NOT EXISTS students (
+        adm_no TEXT,
+        name TEXT NOT NULL,
+        grade TEXT NOT NULL,
+        stream TEXT NOT NULL,
+        gender TEXT NOT NULL,
+        term1 TEXT DEFAULT 'Pending',
+        term2 TEXT DEFAULT 'Pending',
+        term3 TEXT DEFAULT 'Pending',
+        summary_status TEXT DEFAULT '3 Reams Owed',
+        year TEXT DEFAULT '2026',
+        PRIMARY KEY (adm_no, year)
+    )''')
     conn.execute('''
         CREATE TABLE IF NOT EXISTS exam_allocations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -800,5 +802,46 @@ def promote_students():
     except Exception as e:
         flash(f"Promotion Error: {str(e)}")
         return redirect(url_for('admin_dashboard'))
+
+# --- TEMPORARY FIX ROUTE ---
+@app.route('/admin/fix_db')
+def fix_db():
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # 1. Get current columns dynamically so we don't lose any data
+        cursor.execute("PRAGMA table_info(students)")
+        columns = [col[1] for col in cursor.fetchall()]
+        col_names = ", ".join(columns)
+        col_defs = ", ".join([f"{col} TEXT" for col in columns])
+        
+        # 2. Swap tables and recreate with a composite Primary Key
+        cursor.execute("ALTER TABLE students RENAME TO students_old")
+        
+        cursor.execute(f"""
+            CREATE TABLE students (
+                {col_defs},
+                PRIMARY KEY (adm_no, year)
+            )
+        """)
+        
+        # 3. Copy data and clean up
+        cursor.execute(f"INSERT INTO students ({col_names}) SELECT {col_names} FROM students_old")
+        cursor.execute("DROP TABLE students_old")
+        
+        conn.commit()
+        conn.close()
+        return "✅ Database constraint fixed! You can now go back and promote students."
+        
+    except Exception as e:
+        return f"❌ Error fixing DB: {str(e)}"
+
+# --- YOUR EXISTING PROMOTION ROUTE ---
+@app.route('/admin/promote_students', methods=['POST'])
+@login_required
+@role_required(['Admin'])
+def promote_students():
+    # ... (your promotion code stays here)
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
