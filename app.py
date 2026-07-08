@@ -365,7 +365,7 @@ def add_student():
 @app.route('/taker', methods=['POST'])
 @login_required
 @role_required(['Taker', 'Admin'])
-def taker_submit():
+def taker_form_submit():  # <-- Renamed from taker_submit to taker_form_submit
     conn = get_db_connection()
     
     adm_no = request.form.get('adm_no')
