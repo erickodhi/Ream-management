@@ -74,13 +74,16 @@
                             </td>
 
                             <td class="p-3 text-center space-x-2 whitespace-nowrap">
-                                <a href="/taker/submit/{{ student.adm_no }}?term={{ active_term|default('term1') }}&year={{ student.year }}" 
+                                {# Automatically map "Term 1" -> "term1", "Term 2" -> "term2", "Term 3" -> "term3" #}
+                                {% set term_key = 'term1' if config.current_term == 'Term 1' else ('term2' if config.current_term == 'Term 2' else 'term3') %}
+                                
+                                <a href="/taker/submit/{{ student.adm_no }}?term={{ term_key }}&year={{ student.year }}" 
                                    class="inline-block bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-1.5 rounded transition shadow-sm">
-                                   Submitted
+                                    Submitted
                                 </a>
-                                <a href="/taker/undo/{{ student.adm_no }}?term={{ active_term|default('term1') }}&year={{ student.year }}" 
-                                 class="inline-block bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-4 py-1.5 rounded transition shadow-sm">
-                                 Undo
+                                <a href="/taker/undo/{{ student.adm_no }}?term={{ term_key }}&year={{ student.year }}" 
+                                   class="inline-block bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-4 py-1.5 rounded transition shadow-sm">
+                                    Undo
                                 </a>
                             </td>
                         </tr>

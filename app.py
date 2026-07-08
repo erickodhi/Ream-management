@@ -375,6 +375,9 @@ def ream_taker_dashboard():
     conn = get_db_connection()
     config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
     
+    # 1. Capture selected term from URL (defaults to 'term1')
+    active_term = request.args.get('term', 'term1')
+    
     active_year = "2026"
     if config and config['current_year']:
         active_year = str(config['current_year']).strip()
@@ -385,8 +388,9 @@ def ream_taker_dashboard():
     ''', (active_year,)).fetchall()
     
     conn.close()
-    return render_template('ream_taker.html', config=config, students=students)
-
+    
+    # 2. Pass active_term into the HTML template
+    return render_template('ream_taker.html', config=config, students=students, active_term=active_term)
 @app.route('/taker', methods=['POST'])
 @login_required
 @role_required(['Taker', 'Admin'])
@@ -427,21 +431,21 @@ def taker_form_submit():
 def taker_submit(adm_no):
     conn = get_db_connection()
     
-    # 1. Read term and year passed in the URL (e.g. ?term=term1&year=2026)
+    # 1. Grab term and year from URL query args or form
     term = request.args.get('term') or request.form.get('term') or 'term1'
     year = request.args.get('year') or request.form.get('year')
 
-    # 2. Fallback to active system year if missing
+    # 2. Fallback to active system year if not passed
     if not year:
         config = conn.execute('SELECT current_year FROM system_config LIMIT 1').fetchone()
         year = str(config['current_year']) if (config and config['current_year']) else '2026'
 
-    # 3. Update term status to 'Submitted'
+    # 3. Update active term column to 'Submitted'
     if term in ['term1', 'term2', 'term3']:
         query = f"UPDATE students SET {term} = 'Submitted' WHERE TRIM(CAST(adm_no AS TEXT)) = TRIM(CAST(? AS TEXT)) AND TRIM(CAST(year AS TEXT)) = TRIM(CAST(? AS TEXT))"
         conn.execute(query, (str(adm_no), str(year)))
 
-    # 4. Recalculate student summary status
+    # 4. Recalculate summary status
     update_student_summary(conn, adm_no, str(year))
 
     conn.commit()
