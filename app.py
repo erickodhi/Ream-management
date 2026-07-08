@@ -76,6 +76,20 @@ def get_db_connection():
 
     return conn
 
+def get_next_grade(current_grade):
+    grade_map = {
+        'Form 1': 'Form 2',
+        'Form 2': 'Form 3',
+        'Form 3': 'Form 4',
+        'Form 4': 'GRADUATED',
+        
+        # CBC Formats (if your school uses Grades)
+        'Grade 7': 'Grade 8',
+        'Grade 8': 'Grade 9',
+        'Grade 9': 'Grade 10',
+    }
+    return grade_map.get(str(current_grade).strip(), current_grade)
+
 def init_db():
     conn = get_db_connection()
     conn.execute('''
@@ -710,92 +724,58 @@ import sqlite3
 import os
 import sqlite3
 
-@app.route('/admin/promote_students', methods=['POST'])
+@app.route('/promote_students', methods=['POST'])
 @login_required
 @role_required(['Admin'])
-def run_academic_promotion_process():
+def promote_students():
+    current_year = request.form.get('current_year', '2026')
+    target_year = str(int(current_year) + 1)  # Sets target to next year (e.g. 2027)
+    
     conn = get_db_connection()
     cursor = conn.cursor()
-
-    try:
-        # 1. Detect column names dynamically
-        cursor.execute("PRAGMA table_info(students)")
-        cols = [col[1] for col in cursor.fetchall()]
-        form_col = 'grade' if 'grade' in cols else ('form' if 'form' in cols else 'grade')
-
-        # 2. Get current maximum year in database
-        max_year_row = cursor.execute("SELECT MAX(CAST(year AS INTEGER)) FROM students WHERE year IS NOT NULL AND year != ''").fetchone()
-        current_max_year = max_year_row[0] if (max_year_row and max_year_row[0]) else 2026
-        target_year = str(current_max_year + 1)
-
-        # 3. Fetch active students from current latest year
-        cursor.execute(f"""
-            SELECT adm_no, name, {form_col}, stream, gender 
-            FROM students 
-            WHERE TRIM(CAST(year AS TEXT)) = ? OR year IS NULL OR year = ''
-        """, (str(current_max_year),))
-        latest_students = cursor.fetchall()
-
-        if not latest_students:
-            return f"<h1>No Records Found</h1><p>There are no active students in {current_max_year} to promote.</p><p><a href='/admin'>Go Back</a></p>"
-
-        promoted_count = 0
-
-        # Check if secondary tables exist
-        has_ream_table = cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ream_records'").fetchone()
-
-        for adm_no, name, current_class, stream, gender in latest_students:
-            # Advance class
-            class_clean = str(current_class).strip().upper() if current_class else ""
-            if "1" in class_clean:
-                new_class = "Grade 2" if form_col == 'grade' else "Form 2"
-            elif "2" in class_clean:
-                new_class = "Grade 3" if form_col == 'grade' else "Form 3"
-            elif "3" in class_clean:
-                new_class = "Grade 4" if form_col == 'grade' else "Form 4"
-            elif "4" in class_clean:
-                new_class = "Graduated"
-            else:
-                new_class = current_class
-
-            # A. Insert promoted record into students table
-            cursor.execute(f"""
-                INSERT OR REPLACE INTO students (adm_no, name, {form_col}, stream, gender, year)
+    
+    # 1. Get all students registered in the selected year
+    current_students = cursor.execute("""
+        SELECT adm_no, name, grade, stream, gender 
+        FROM students 
+        WHERE TRIM(CAST(year AS TEXT)) = ?
+    """, (current_year,)).fetchall()
+    
+    promoted_count = 0
+    graduated_count = 0
+    
+    for student in current_students:
+        adm_no = student['adm_no']
+        name = student['name']
+        current_grade = str(student['grade']).strip()
+        stream = student['stream']
+        gender = student['gender']
+        
+        # 2. Find the student's next grade level
+        next_grade = get_next_grade(current_grade)
+        
+        if next_grade == "GRADUATED":
+            graduated_count += 1
+            continue  # Don't create an active record for graduated students
+            
+        # 3. Check if they are already in the new year (prevents duplicates)
+        existing = cursor.execute("""
+            SELECT id FROM students 
+            WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?
+        """, (adm_no, target_year)).fetchone()
+        
+        # 4. INSERT a new row for the new year (Preserves the old year's row)
+        if not existing:
+            cursor.execute("""
+                INSERT INTO students (adm_no, name, grade, stream, gender, year)
                 VALUES (?, ?, ?, ?, ?, ?)
-            """, (adm_no, name, new_class, stream, gender, target_year))
-
-            # B. Carry over / initialize ream record for the new year
-            if has_ream_table:
-                # Check previous year's ream record
-                prev_ream = cursor.execute("""
-                    SELECT reams_brought, reams_owed FROM ream_records 
-                    WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?
-                """, (adm_no, str(current_max_year))).fetchone()
-                
-                owed = prev_ream['reams_owed'] if prev_ream else 1
-                
-                cursor.execute("""
-                    INSERT OR REPLACE INTO ream_records (adm_no, year, reams_brought, reams_owed)
-                    VALUES (?, ?, 0, ?)
-                """, (adm_no, target_year, owed))
-
+            """, (adm_no, name, next_grade, stream, gender, target_year))
             promoted_count += 1
 
-        conn.commit()
-
-        return f"""
-        <div style="font-family: sans-serif; padding: 20px;">
-            <h1 style="color: #16a34a;">Promotion Complete!</h1>
-            <p style="font-size: 16px;">Successfully promoted <strong>{promoted_count}</strong> students from <strong>{current_max_year}</strong> to <strong>{target_year}</strong>.</p>
-            <p style="font-size: 14px; color: #4b5563;">Previous year ({current_max_year}) records and statements remain fully viewable in your dashboard filter.</p>
-            <a href='/admin' style="display: inline-block; margin-top: 15px; padding: 10px 20px; background: #2563eb; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Return to Admin Dashboard</a>
-        </div>
-        """
-
-    except Exception as e:
-        conn.rollback()
-        return f"An error occurred during promotion: {str(e)}", 500
-    finally:
-        conn.close()
+    conn.commit()
+    conn.close()
+    
+    flash(f"Promotion Complete! Promoted: {promoted_count} | Graduated: {graduated_count} to Year {target_year}")
+    return redirect(url_for('admin_dashboard'))
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
