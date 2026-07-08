@@ -130,10 +130,16 @@ def update_student_summary(conn, adm_no, year):
     ).fetchone()
     
     if student:
+        # Define what statuses count as "Cleared"
+        cleared_statuses = ['Submitted', 'Submitted ', 'Brought', 'Brought ']
+        
         pending_count = 0
-        if student['term1'] == 'Pending': pending_count += 1
-        if student['term2'] == 'Pending': pending_count += 1
-        if student['term3'] == 'Pending': pending_count += 1
+        if student['term1'] not in cleared_statuses:
+            pending_count += 1
+        if student['term2'] not in cleared_statuses:
+            pending_count += 1
+        if student['term3'] not in cleared_statuses:
+            pending_count += 1
         
         summary = "Cleared ✅" if pending_count == 0 else f"{pending_count} Reams Owed"
         
@@ -384,25 +390,30 @@ def ream_taker_dashboard():
 @app.route('/taker', methods=['POST'])
 @login_required
 @role_required(['Taker', 'Admin'])
-def taker_form_submit():  # <-- Renamed from taker_submit to taker_form_submit
+def taker_form_submit():
     conn = get_db_connection()
     
     adm_no = request.form.get('adm_no')
     term = request.form.get('term')
-    status = request.form.get('status', 'Brought')
+    status = request.form.get('status', 'Submitted')  # <-- Changed default to 'Submitted'
     year = request.form.get('year')
+
+    # Guard check: redirect safely if no adm_no passed
+    if not adm_no:
+        conn.close()
+        return redirect('/taker')
 
     # Fallback to system config year if form didn't pass year
     if not year:
         config = conn.execute('SELECT current_year FROM system_config LIMIT 1').fetchone()
         year = str(config['current_year']) if (config and config['current_year']) else '2026'
 
-    # Update the term for this specific student and year
+    # Update the term to 'Submitted' for this specific student and year
     if term in ['term1', 'term2', 'term3']:
         query = "UPDATE students SET " + term + " = ? WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?"
-        conn.execute(query, (status, adm_no, str(year)))
+        conn.execute(query, ('Submitted', adm_no, str(year)))  # <-- Writes 'Submitted' directly
 
-    # Pass all 3 required arguments to update_student_summary!
+    # Recalculate summary status
     update_student_summary(conn, adm_no, str(year))
 
     conn.commit()
@@ -418,7 +429,7 @@ def taker_submit(adm_no):
     
     # 1. Get term, status, and year from form or request parameters
     term = request.form.get('term') or request.args.get('term')
-    status = request.form.get('status') or request.args.get('status', 'Brought')
+    status = request.form.get('status') or request.args.get('status', 'Submitted') # Changed default to 'Submitted'
     year = request.form.get('year') or request.args.get('year')
 
     # 2. Fallback to active system year if year wasn't passed
@@ -426,12 +437,12 @@ def taker_submit(adm_no):
         config = conn.execute('SELECT current_year FROM system_config LIMIT 1').fetchone()
         year = str(config['current_year']) if (config and config['current_year']) else '2026'
 
-    # 3. Update term status if provided
+    # 3. Force status to 'Submitted' when updating the active term
     if term in ['term1', 'term2', 'term3']:
         query = "UPDATE students SET " + term + " = ? WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?"
-        conn.execute(query, (status, adm_no, str(year)))
+        conn.execute(query, ('Submitted', adm_no, str(year)))
 
-    # 4. Now 'year' is guaranteed to exist and be defined!
+    # 4. Recalculate summary status
     update_student_summary(conn, adm_no, str(year))
 
     conn.commit()
