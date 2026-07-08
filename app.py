@@ -728,54 +728,54 @@ import sqlite3
 @login_required
 @role_required(['Admin'])
 def promote_students():
-    current_year = request.form.get('current_year', '2026')
-    target_year = str(int(current_year) + 1)  # Sets target to next year (e.g. 2027)
-    
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    # 1. Get all students registered in the selected year
-    current_students = cursor.execute("""
-        SELECT adm_no, name, grade, stream, gender 
-        FROM students 
-        WHERE TRIM(CAST(year AS TEXT)) = ?
-    """, (current_year,)).fetchall()
-    
-    promoted_count = 0
-    graduated_count = 0
-    
-    for student in current_students:
-        adm_no = student['adm_no']
-        name = student['name']
-        current_grade = str(student['grade']).strip()
-        stream = student['stream']
-        gender = student['gender']
+    try:
+        current_year = request.form.get('current_year', '2026').strip()
+        target_year = str(int(current_year) + 1)
         
-        # 2. Find the student's next grade level
-        next_grade = get_next_grade(current_grade)
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        if next_grade == "GRADUATED":
-            graduated_count += 1
-            continue  # Don't create an active record for graduated students
+        current_students = cursor.execute("""
+            SELECT adm_no, grade 
+            FROM students 
+            WHERE TRIM(CAST(year AS TEXT)) = ?
+        """, (current_year,)).fetchall()
+        
+        promoted_count = 0
+        graduated_count = 0
+        
+        for student in current_students:
+            adm_no = student['adm_no']
+            current_grade = str(student['grade']).strip() if student['grade'] else ''
             
-        # 3. Check if they are already in the new year (prevents duplicates)
-        existing = cursor.execute("""
-            SELECT id FROM students 
-            WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?
-        """, (adm_no, target_year)).fetchone()
-        
-        # 4. INSERT a new row for the new year (Preserves the old year's row)
-        if not existing:
-            cursor.execute("""
-                INSERT INTO students (adm_no, name, grade, stream, gender, year)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (adm_no, name, next_grade, stream, gender, target_year))
-            promoted_count += 1
+            next_grade = get_next_grade(current_grade)
+            
+            if next_grade == "GRADUATED":
+                graduated_count += 1
+                continue
+                
+            # FIX: Query adm_no instead of id to prevent 'no such column: id'
+            existing = cursor.execute("""
+                SELECT adm_no FROM students 
+                WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?
+            """, (adm_no, target_year)).fetchone()
+            
+            if not existing:
+                cursor.execute("""
+                    UPDATE students 
+                    SET grade = ?, year = ?
+                    WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?
+                """, (next_grade, target_year, adm_no, current_year))
+                promoted_count += 1
 
-    conn.commit()
-    conn.close()
+        conn.commit()
+        conn.close()
+        
+        flash(f"Promotion Complete! Promoted: {promoted_count} | Graduated: {graduated_count} to Year {target_year}")
     
-    flash(f"Promotion Complete! Promoted: {promoted_count} | Graduated: {graduated_count} to Year {target_year}")
+    except Exception as e:
+        flash(f"Promotion Error: {str(e)}")
+        
     return redirect(url_for('admin_dashboard'))
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
