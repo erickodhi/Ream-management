@@ -837,11 +837,5 @@ def fix_db():
     except Exception as e:
         return f"❌ Error fixing DB: {str(e)}"
 
-# --- YOUR EXISTING PROMOTION ROUTE ---
-@app.route('/admin/promote_students', methods=['POST'])
-@login_required
-@role_required(['Admin'])
-def promote_students():
-    # ... (your promotion code stays here)
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
