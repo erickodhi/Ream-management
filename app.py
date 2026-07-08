@@ -410,25 +410,33 @@ def taker_form_submit():  # <-- Renamed from taker_submit to taker_form_submit
     
     return redirect('/taker')
     
-@app.route('/taker/submit/<adm_no>')
+@app.route('/taker/submit/<adm_no>', methods=['POST', 'GET'])
 @login_required
 @role_required(['Taker', 'Admin'])
 def taker_submit(adm_no):
     conn = get_db_connection()
-    config = conn.execute('SELECT current_term, current_year FROM system_config LIMIT 1').fetchone()
-    current_term = config['current_term'].replace(" ", "").lower()
     
-    # Read and sanitize the active year string
-    active_year = "2026"
-    if config and config['current_year']:
-        active_year = str(config['current_year']).strip()
+    # 1. Get term, status, and year from form or request parameters
+    term = request.form.get('term') or request.args.get('term')
+    status = request.form.get('status') or request.args.get('status', 'Brought')
+    year = request.form.get('year') or request.args.get('year')
 
-    # Update only for the Admin's active year
-    conn.execute(f"UPDATE students SET {current_term} = 'Submitted' WHERE adm_no = ? AND year = ?", (adm_no, active_year))
-    
-    update_student_summary(conn, adm_no, year)
+    # 2. Fallback to active system year if year wasn't passed
+    if not year:
+        config = conn.execute('SELECT current_year FROM system_config LIMIT 1').fetchone()
+        year = str(config['current_year']) if (config and config['current_year']) else '2026'
+
+    # 3. Update term status if provided
+    if term in ['term1', 'term2', 'term3']:
+        query = "UPDATE students SET " + term + " = ? WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?"
+        conn.execute(query, (status, adm_no, str(year)))
+
+    # 4. Now 'year' is guaranteed to exist and be defined!
+    update_student_summary(conn, adm_no, str(year))
+
     conn.commit()
     conn.close()
+    
     return redirect('/taker')
 
 @app.route('/taker/undo/<adm_no>')
