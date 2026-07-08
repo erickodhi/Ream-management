@@ -760,7 +760,7 @@ def promote_students():
         promoted_count = 0
         graduated_count = 0
 
-        # 3. Duplicate student rows into the new year with promoted grades
+        # 3. Create fresh new-year records with reset ream status
         for student in current_students:
             adm_no = student['adm_no']
             name = student['name'] if 'name' in student.keys() else ''
@@ -779,24 +779,28 @@ def promote_students():
                 """, (adm_no, current_year_str))
                 graduated_count += 1
             else:
-                # Check if a record already exists for the target year to prevent duplicates
+                # Check if a record already exists for the target year
                 existing = cursor.execute("""
                     SELECT adm_no FROM students 
                     WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?
                 """, (adm_no, target_year_str)).fetchone()
 
                 if not existing:
-                    # INSERT a NEW row for the target year (preserves historical 2026 record!)
+                    # INSERT fresh record for the new year:
+                    # Terms reset to 'Pending', summary resets to '3 Reams Owed'
                     cursor.execute("""
-                        INSERT INTO students (adm_no, name, stream, gender, grade, year)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        INSERT INTO students (
+                            adm_no, name, stream, gender, grade, year, 
+                            term1, term2, term3, summary_status
+                        )
+                        VALUES (?, ?, ?, ?, ?, ?, 'Pending', 'Pending', 'Pending', '3 Reams Owed')
                     """, (adm_no, name, stream, gender, next_grade, target_year_str))
                     promoted_count += 1
 
         conn.commit()
         conn.close()
 
-        flash(f"Promotion Complete! Promoted: {promoted_count} | Graduated: {graduated_count} | 2026 records preserved and new {target_year_str} records created!")
+        flash(f"Promotion Complete! Promoted: {promoted_count} | Graduated: {graduated_count} | Fresh 3-ream balances assigned for Year {target_year_str}!")
         return redirect(url_for('admin_dashboard', selected_year=target_year_str))
 
     except Exception as e:
