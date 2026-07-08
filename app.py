@@ -732,40 +732,38 @@ def promote_students():
         conn = get_db_connection()
         cursor = conn.cursor()
 
-        # 1. Backfill any NULL/empty years in DB to '2026' so no students are orphaned
-        cursor.execute("""
-            UPDATE students 
-            SET year = '2026' 
-            WHERE year IS NULL OR TRIM(CAST(year AS TEXT)) = ''
-        """)
-        conn.commit()
+        # 1. AUTO-DETECT: Find the highest active academic year currently in the DB
+        # This completely ignores form mismatch and targets the actual current batch!
+        max_year_row = cursor.execute("""
+            SELECT MAX(CAST(year AS INTEGER)) 
+            FROM students 
+            WHERE grade != 'GRADUATED' AND year IS NOT NULL
+        """).fetchone()
 
-        # 2. Get current year from form or fallback to active year in DB
-        posted_year = request.form.get('current_year') or request.form.get('year')
-        
-        if posted_year and posted_year.strip():
-            current_year_str = posted_year.strip()
+        if max_year_row and max_year_row[0]:
+            current_year = max_year_row[0]
         else:
-            current_year_str = '2026'
+            current_year = 2026
 
-        target_year_str = str(int(current_year_str) + 1)
+        current_year_str = str(current_year)
+        target_year_str = str(current_year + 1)
 
-        # 3. Fetch all students for the active year
+        # 2. Fetch all active students in that highest year batch
         current_students = cursor.execute("""
             SELECT adm_no, grade 
             FROM students 
-            WHERE TRIM(CAST(year AS TEXT)) = ?
+            WHERE TRIM(CAST(year AS TEXT)) = ? AND (grade != 'GRADUATED' OR grade IS NULL)
         """, (current_year_str,)).fetchall()
 
         if not current_students:
-            flash(f"No active students found for Year {current_year_str} to promote.")
+            flash(f"No active student records found in Year {current_year_str} to promote.")
             conn.close()
             return redirect(url_for('admin_dashboard', selected_year=current_year_str))
 
         promoted_count = 0
         graduated_count = 0
 
-        # 4. Promote each student
+        # 3. Perform the rollover
         for student in current_students:
             adm_no = student['adm_no']
             current_grade = str(student['grade']).strip() if student['grade'] else ''
@@ -790,7 +788,9 @@ def promote_students():
         conn.commit()
         conn.close()
 
-        flash(f"Promotion Successful! Promoted: {promoted_count} | Graduated: {graduated_count} | Moved to Year {target_year_str}")
+        flash(f"Rollover Complete! Promoted: {promoted_count} | Graduated: {graduated_count} | Moved from Year {current_year_str} -> {target_year_str}")
+        
+        # Redirect to dashboard showing the newly created target year!
         return redirect(url_for('admin_dashboard', selected_year=target_year_str))
 
     except Exception as e:
