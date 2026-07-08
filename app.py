@@ -729,53 +729,72 @@ import sqlite3
 @role_required(['Admin'])
 def promote_students():
     try:
-        current_year = request.form.get('current_year', '2026').strip()
-        target_year = str(int(current_year) + 1)
-        
         conn = get_db_connection()
         cursor = conn.cursor()
+
+        # 1. Backfill any NULL/empty years in DB to '2026' so no students are orphaned
+        cursor.execute("""
+            UPDATE students 
+            SET year = '2026' 
+            WHERE year IS NULL OR TRIM(CAST(year AS TEXT)) = ''
+        """)
+        conn.commit()
+
+        # 2. Get current year from form or fallback to active year in DB
+        posted_year = request.form.get('current_year') or request.form.get('year')
         
+        if posted_year and posted_year.strip():
+            current_year_str = posted_year.strip()
+        else:
+            current_year_str = '2026'
+
+        target_year_str = str(int(current_year_str) + 1)
+
+        # 3. Fetch all students for the active year
         current_students = cursor.execute("""
             SELECT adm_no, grade 
             FROM students 
             WHERE TRIM(CAST(year AS TEXT)) = ?
-        """, (current_year,)).fetchall()
-        
+        """, (current_year_str,)).fetchall()
+
+        if not current_students:
+            flash(f"No active students found for Year {current_year_str} to promote.")
+            conn.close()
+            return redirect(url_for('admin_dashboard', selected_year=current_year_str))
+
         promoted_count = 0
         graduated_count = 0
-        
+
+        # 4. Promote each student
         for student in current_students:
             adm_no = student['adm_no']
             current_grade = str(student['grade']).strip() if student['grade'] else ''
-            
+
             next_grade = get_next_grade(current_grade)
-            
+
             if next_grade == "GRADUATED":
+                cursor.execute("""
+                    UPDATE students 
+                    SET grade = 'GRADUATED'
+                    WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?
+                """, (adm_no, current_year_str))
                 graduated_count += 1
-                continue
-                
-            # FIX: Query adm_no instead of id to prevent 'no such column: id'
-            existing = cursor.execute("""
-                SELECT adm_no FROM students 
-                WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?
-            """, (adm_no, target_year)).fetchone()
-            
-            if not existing:
+            else:
                 cursor.execute("""
                     UPDATE students 
                     SET grade = ?, year = ?
                     WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?
-                """, (next_grade, target_year, adm_no, current_year))
+                """, (next_grade, target_year_str, adm_no, current_year_str))
                 promoted_count += 1
 
         conn.commit()
         conn.close()
-        
-        flash(f"Promotion Complete! Promoted: {promoted_count} | Graduated: {graduated_count} to Year {target_year}")
-    
+
+        flash(f"Promotion Successful! Promoted: {promoted_count} | Graduated: {graduated_count} | Moved to Year {target_year_str}")
+        return redirect(url_for('admin_dashboard', selected_year=target_year_str))
+
     except Exception as e:
         flash(f"Promotion Error: {str(e)}")
-        
-    return redirect(url_for('admin_dashboard'))
+        return redirect(url_for('admin_dashboard'))
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
