@@ -361,6 +361,25 @@ def add_student():
     return redirect('/admin')
 
 # ------------------ REAM TAKER DESK ------------------
+# 1. GET ROUTE (First) - Opens the page when you log in
+@app.route('/taker', methods=['GET'])
+@login_required
+@role_required(['Taker', 'Admin'])
+def ream_taker_dashboard():
+    conn = get_db_connection()
+    config = conn.execute('SELECT * FROM system_config LIMIT 1').fetchone()
+    
+    active_year = "2026"
+    if config and config['current_year']:
+        active_year = str(config['current_year']).strip()
+    
+    students = conn.execute('''
+        SELECT * FROM students 
+        WHERE CAST(year AS INTEGER) = CAST(? AS INTEGER)
+    ''', (active_year,)).fetchall()
+    
+    conn.close()
+    return render_template('ream_taker.html', config=config, students=students)
 
 @app.route('/taker', methods=['POST'])
 @login_required
