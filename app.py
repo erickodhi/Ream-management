@@ -421,28 +421,27 @@ def taker_form_submit():
     
     return redirect('/taker')
     
-@app.route('/taker/submit/<adm_no>', methods=['POST', 'GET'])
+@app.route('/taker/submit/<adm_no>', methods=['GET', 'POST'])
 @login_required
 @role_required(['Taker', 'Admin'])
 def taker_submit(adm_no):
     conn = get_db_connection()
     
-    # 1. Get term, status, and year from form or request parameters
-    term = request.form.get('term') or request.args.get('term')
-    status = request.form.get('status') or request.args.get('status', 'Submitted') # Changed default to 'Submitted'
-    year = request.form.get('year') or request.args.get('year')
+    # 1. Read term and year passed in the URL (e.g. ?term=term1&year=2026)
+    term = request.args.get('term') or request.form.get('term') or 'term1'
+    year = request.args.get('year') or request.form.get('year')
 
-    # 2. Fallback to active system year if year wasn't passed
+    # 2. Fallback to active system year if missing
     if not year:
         config = conn.execute('SELECT current_year FROM system_config LIMIT 1').fetchone()
         year = str(config['current_year']) if (config and config['current_year']) else '2026'
 
-    # 3. Force status to 'Submitted' when updating the active term
+    # 3. Update term status to 'Submitted'
     if term in ['term1', 'term2', 'term3']:
-        query = "UPDATE students SET " + term + " = ? WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?"
-        conn.execute(query, ('Submitted', adm_no, str(year)))
+        query = f"UPDATE students SET {term} = 'Submitted' WHERE TRIM(CAST(adm_no AS TEXT)) = TRIM(CAST(? AS TEXT)) AND TRIM(CAST(year AS TEXT)) = TRIM(CAST(? AS TEXT))"
+        conn.execute(query, (str(adm_no), str(year)))
 
-    # 4. Recalculate summary status
+    # 4. Recalculate student summary status
     update_student_summary(conn, adm_no, str(year))
 
     conn.commit()
@@ -450,25 +449,30 @@ def taker_submit(adm_no):
     
     return redirect('/taker')
 
-@app.route('/taker/undo/<adm_no>')
+@app.route('/taker/undo/<adm_no>', methods=['GET', 'POST'])
 @login_required
 @role_required(['Taker', 'Admin'])
 def taker_undo(adm_no):
     conn = get_db_connection()
-    config = conn.execute('SELECT current_term, current_year FROM system_config LIMIT 1').fetchone()
-    current_term = config['current_term'].replace(" ", "").lower()
     
-    # Read and sanitize the active year string
-    active_year = "2026"
-    if config and config['current_year']:
-        active_year = str(config['current_year']).strip()
+    term = request.args.get('term') or request.form.get('term') or 'term1'
+    year = request.args.get('year') or request.form.get('year')
 
-    # Update only for the Admin's active year
-    conn.execute(f"UPDATE students SET {current_term} = 'Pending' WHERE adm_no = ? AND year = ?", (adm_no, active_year))
-    
-    update_student_summary(conn, adm_no)
+    if not year:
+        config = conn.execute('SELECT current_year FROM system_config LIMIT 1').fetchone()
+        year = str(config['current_year']) if (config and config['current_year']) else '2026'
+
+    # Reset term status back to 'Pending'
+    if term in ['term1', 'term2', 'term3']:
+        query = f"UPDATE students SET {term} = 'Pending' WHERE TRIM(CAST(adm_no AS TEXT)) = TRIM(CAST(? AS TEXT)) AND TRIM(CAST(year AS TEXT)) = TRIM(CAST(? AS TEXT))"
+        conn.execute(query, (str(adm_no), str(year)))
+
+    # Recalculate summary status
+    update_student_summary(conn, adm_no, str(year))
+
     conn.commit()
     conn.close()
+    
     return redirect('/taker')
 # ------------------ EXAMINATION DEPARTMENT DESK ------------------
 
