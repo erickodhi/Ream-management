@@ -138,15 +138,24 @@ def init_db():
 def initialize_on_startup():
     init_db()
 
-def update_student_summary(conn, adm_no):
-    student = conn.execute('SELECT term1, term2, term3 FROM students WHERE adm_no = ?', (adm_no,)).fetchone()
+def update_student_summary(conn, adm_no, year):
+    student = conn.execute(
+        'SELECT term1, term2, term3 FROM students WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?', 
+        (adm_no, str(year))
+    ).fetchone()
+    
     if student:
         pending_count = 0
         if student['term1'] == 'Pending': pending_count += 1
         if student['term2'] == 'Pending': pending_count += 1
         if student['term3'] == 'Pending': pending_count += 1
+        
         summary = "Cleared ✅" if pending_count == 0 else f"{pending_count} Reams Owed"
-        conn.execute('UPDATE students SET summary_status = ? WHERE adm_no = ?', (summary, adm_no))
+        
+        conn.execute(
+            'UPDATE students SET summary_status = ? WHERE adm_no = ? AND TRIM(CAST(year AS TEXT)) = ?', 
+            (summary, adm_no, str(year))
+        )
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -407,7 +416,7 @@ def taker_submit(adm_no):
     # Update only for the Admin's active year
     conn.execute(f"UPDATE students SET {current_term} = 'Submitted' WHERE adm_no = ? AND year = ?", (adm_no, active_year))
     
-    update_student_summary(conn, adm_no)
+    update_student_summary(conn, adm_no, year)
     conn.commit()
     conn.close()
     return redirect('/taker')
@@ -840,6 +849,22 @@ def fix_db():
         
     except Exception as e:
         return f"❌ Error fixing DB: {str(e)}"
+
+# --- ADMIN CLEANUP ROUTES ---
+
+@app.route('/admin/recalculate_summaries')
+def recalculate_summaries():
+    try:
+        conn = get_db_connection()
+        students = conn.execute('SELECT adm_no, year FROM students').fetchall()
+        for s in students:
+            if s['adm_no'] and s['year']:
+                update_student_summary(conn, s['adm_no'], s['year'])
+        conn.commit()
+        conn.close()
+        return "✅ Summaries recalculated! 2027 records are now showing 3 Reams Owed."
+    except Exception as e:
+        return f"❌ Error: {str(e)}"
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
