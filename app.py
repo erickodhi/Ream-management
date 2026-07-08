@@ -724,7 +724,7 @@ import sqlite3
 import os
 import sqlite3
 
-@app.route('/promote_students', methods=['POST'])
+@app.route('/admin/promote_students', methods=['POST'])
 @login_required
 @role_required(['Admin'])
 def promote_students():
