@@ -1,54 +1,66 @@
-{% extends "base.html" %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loose Paper Balance</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
+</head>
+<body class="bg-light">
 
-{% block content %}
 <div class="container mt-4">
-    <h2>📄 Loose & Unused Paper Tracker</h2>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>📄 Loose & Unused Paper Balance</h2>
+        <a href="javascript:history.back()" class="btn btn-secondary btn-sm">← Back</a>
+    </div>
     <hr>
 
-    <!-- Current Balance (Visible to Everyone, including Principal) -->
-    <div class="card bg-light mb-4 shadow-sm">
+    <!-- Current Balance Display -->
+    <div class="card bg-white mb-4 shadow-sm">
         <div class="card-body text-center">
             <h5 class="card-title text-muted">Current Loose Sheets Available</h5>
             <h1 class="display-3 font-weight-bold text-primary">{{ current_unused }}</h1>
-            <p class="card-text text-secondary">Individual loose sheets in store for exam printing.</p>
+            <p class="card-text text-secondary">Individual sheets available in store for exam printing.</p>
         </div>
     </div>
 
     {% if session.get('role') not in ['principal', 'headmaster'] %}
-    <!-- Forms to Add or Deduct (Hidden from Principal) -->
+    <!-- Management Forms (Hidden from Principal) -->
     <div class="row">
+        <!-- Add Loose Sheets -->
         <div class="col-md-6 mb-3">
             <div class="card shadow-sm">
-                <div class="card-header bg-primary text-white">Add Loose Sheets</div>
+                <div class="card-header bg-primary text-white font-weight-bold">Add Loose Sheets</div>
                 <div class="card-body">
                     <form action="{{ url_for('update_unused') }}" method="POST">
                         <input type="hidden" name="action" value="add">
                         <div class="form-group mb-2">
-                            <label>Sheets Count:</label>
+                            <label>Number of Sheets:</label>
                             <input type="number" name="sheets_count" class="form-control" required min="1">
                         </div>
                         <div class="form-group mb-3">
-                            <label>Note / Reason:</label>
+                            <label>Reason / Note:</label>
                             <input type="text" name="notes" class="form-control" placeholder="e.g. Opened 1 ream for CATs" required>
                         </div>
-                        <button type="submit" class="btn btn-primary btn-block">Add Sheets</button>
+                        <button type="submit" class="btn btn-primary btn-block">Add to Unused Balance</button>
                     </form>
                 </div>
             </div>
         </div>
 
+        <!-- Log Consumed Sheets -->
         <div class="col-md-6 mb-3">
             <div class="card shadow-sm">
-                <div class="card-header bg-warning text-dark">Log Consumed / Printed Sheets</div>
+                <div class="card-header bg-warning text-dark font-weight-bold">Log Used Sheets</div>
                 <div class="card-body">
                     <form action="{{ url_for('update_unused') }}" method="POST">
                         <input type="hidden" name="action" value="use">
                         <div class="form-group mb-2">
-                            <label>Sheets Used:</label>
+                            <label>Number of Sheets Used:</label>
                             <input type="number" name="sheets_count" class="form-control" required min="1">
                         </div>
                         <div class="form-group mb-3">
-                            <label>Note / Reason:</label>
+                            <label>Reason / Note:</label>
                             <input type="text" name="notes" class="form-control" placeholder="e.g. Printed Form 4 Mock" required>
                         </div>
                         <button type="submit" class="btn btn-warning btn-block">Deduct Sheets</button>
@@ -58,21 +70,22 @@
         </div>
     </div>
     {% else %}
-    <div class="alert alert-info text-center" role="alert">
-        ℹ️ <strong>Principal View:</strong> Read-only access to total loose sheet counts and usage history.
+    <!-- Read-Only Notice for Principal -->
+    <div class="alert alert-info text-center shadow-sm" role="alert">
+        ℹ️ <strong>Principal View:</strong> Live loose sheet counts and usage logs.
     </div>
     {% endif %}
 
-    <!-- History Table -->
+    <!-- Activity Log Table -->
     <div class="mt-4">
-        <h4>Recent Activity</h4>
-        <table class="table table-striped border">
+        <h4>Recent Activity Log</h4>
+        <table class="table table-striped table-bordered bg-white">
             <thead class="thead-dark">
                 <tr>
                     <th>Date & Time</th>
                     <th>Action</th>
                     <th>Sheets</th>
-                    <th>Note / Logged By</th>
+                    <th>Recorded By / Note</th>
                 </tr>
             </thead>
             <tbody>
@@ -83,7 +96,7 @@
                         {% if log['action'] == 'add' %}
                             <span class="badge badge-success">Added</span>
                         {% else %}
-                            <span class="badge badge-danger">Deducted</span>
+                            <span class="badge badge-danger">Used</span>
                         {% endif %}
                     </td>
                     <td>{{ log['sheets_count'] }}</td>
@@ -91,11 +104,13 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="4" class="text-center text-muted">No activity recorded yet.</td>
+                    <td colspan="4" class="text-center text-muted">No loose sheet logs recorded yet.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
-{% endblock %}
+
+</body>
+</html>
