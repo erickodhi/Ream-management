@@ -61,6 +61,28 @@ def get_db_connection():
     conn.execute('PRAGMA journal_mode=WAL;')
     return conn
 
+def init_paper_usage_db():
+    conn = get_db_connection()
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS paper_usage (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            action TEXT NOT NULL,          -- 'add' or 'use'
+            sheets_count INTEGER NOT NULL,
+            notes TEXT,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+def get_unused_balance():
+    init_paper_usage_db()
+    conn = get_db_connection()
+    added = conn.execute("SELECT SUM(sheets_count) FROM paper_usage WHERE action = 'add'").fetchone()[0] or 0
+    used = conn.execute("SELECT SUM(sheets_count) FROM paper_usage WHERE action = 'use'").fetchone()[0] or 0
+    conn.close()
+    return added - used
+
 def get_next_grade(current_grade):
     grade_map = {
         'Form 1': 'Form 2',
@@ -902,6 +924,45 @@ def recalculate_summaries():
         return "✅ Summaries recalculated! 2027 records are now showing 3 Reams Owed."
     except Exception as e:
         return f"❌ Error: {str(e)}"
+
+# 1. View Unused Sheets (Accessible by all logged-in users, including Principal)
+@app.route('/unused')
+def unused_page():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+        
+    current_unused = get_unused_balance()
+    conn = get_db_connection()
+    history = conn.execute('SELECT * FROM paper_usage ORDER BY id DESC LIMIT 15').fetchall()
+    conn.close()
+    
+    return render_template('unused.html', current_unused=current_unused, history=history)
+
+# 2. Update Unused Count (Restricted so Principal cannot submit/modify)
+@app.route('/update_unused', methods=['POST'])
+def update_unused():
+    if 'username' not in session:
+        return redirect(url_for('login'))
+        
+    # Block principal from logging actions
+    if session.get('role') in ['principal', 'headmaster']:
+        flash("You have read-only access to loose sheets balance.", "danger")
+        return redirect(url_for('unused_page'))
+
+    action = request.form.get('action')
+    sheets_count = int(request.form.get('sheets_count', 0))
+    notes = f"{session.get('username')} - {request.form.get('notes', '')}"
+
+    if sheets_count > 0:
+        conn = get_db_connection()
+        conn.execute(
+            'INSERT INTO paper_usage (action, sheets_count, notes) VALUES (?, ?, ?)',
+            (action, sheets_count, notes)
+        )
+        conn.commit()
+        conn.close()
+
+    return redirect(url_for('unused_page'))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>📄 Loose & Unused Paper Tracker</h2>
+    <hr>
+
+    <!-- Current Balance (Visible to Everyone, including Principal) -->
+    <div class="card bg-light mb-4 shadow-sm">
+        <div class="card-body text-center">
+            <h5 class="card-title text-muted">Current Loose Sheets Available</h5>
+            <h1 class="display-3 font-weight-bold text-primary">{{ current_unused }}</h1>
+            <p class="card-text text-secondary">Individual loose sheets in store for exam printing.</p>
+        </div>
+    </div>
+
+    {% if session.get('role') not in ['principal', 'headmaster'] %}
+    <!-- Forms to Add or Deduct (Hidden from Principal) -->
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">Add Loose Sheets</div>
+                <div class="card-body">
+                    <form action="{{ url_for('update_unused') }}" method="POST">
+                        <input type="hidden" name="action" value="add">
+                        <div class="form-group mb-2">
+                            <label>Sheets Count:</label>
+                            <input type="number" name="sheets_count" class="form-control" required min="1">
+                        </div>
+                        <div class="form-group mb-3">
+                            <label>Note / Reason:</label>
+                            <input type="text" name="notes" class="form-control" placeholder="e.g. Opened 1 ream for CATs" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-block">Add Sheets</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 mb-3">
+            <div class="card shadow-sm">
+                <div class="card-header bg-warning text-dark">Log Consumed / Printed Sheets</div>
+                <div class="card-body">
+                    <form action="{{ url_for('update_unused') }}" method="POST">
+                        <input type="hidden" name="action" value="use">
+                        <div class="form-group mb-2">
+                            <label>Sheets Used:</label>
+                            <input type="number" name="sheets_count" class="form-control" required min="1">
+                        </div>
+                        <div class="form-group mb-3">
+                            <label>Note / Reason:</label>
+                            <input type="text" name="notes" class="form-control" placeholder="e.g. Printed Form 4 Mock" required>
+                        </div>
+                        <button type="submit" class="btn btn-warning btn-block">Deduct Sheets</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info text-center" role="alert">
+        ℹ️ <strong>Principal View:</strong> Read-only access to total loose sheet counts and usage history.
+    </div>
+    {% endif %}
+
+    <!-- History Table -->
+    <div class="mt-4">
+        <h4>Recent Activity</h4>
+        <table class="table table-striped border">
+            <thead class="thead-dark">
+                <tr>
+                    <th>Date & Time</th>
+                    <th>Action</th>
+                    <th>Sheets</th>
+                    <th>Note / Logged By</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in history %}
+                <tr>
+                    <td>{{ log['timestamp'] }}</td>
+                    <td>
+                        {% if log['action'] == 'add' %}
+                            <span class="badge badge-success">Added</span>
+                        {% else %}
+                            <span class="badge badge-danger">Deducted</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ log['sheets_count'] }}</td>
+                    <td>{{ log['notes'] }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted">No activity recorded yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
