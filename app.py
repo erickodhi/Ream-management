@@ -4,7 +4,7 @@ from functools import wraps
 from flask import abort
 
 
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
 import sqlite3
 import math
 import africastalking  # 1. Import the SMS module smoothly
