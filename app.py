@@ -926,9 +926,13 @@ def recalculate_summaries():
         return f"❌ Error: {str(e)}"
 
 # 1. View Unused Sheets (Accessible by all logged-in users, including Principal)
+# 1. View Unused Sheets
 @app.route('/unused')
 def unused_page():
-    if 'username' not in session:
+    # Check if user is authenticated via Flask-Login or standard Session
+    is_logged_in = (current_user and current_user.is_authenticated) or ('username' in session) or ('user_id' in session)
+    
+    if not is_logged_in:
         return redirect(url_for('login'))
         
     current_unused = get_unused_balance()
@@ -938,20 +942,27 @@ def unused_page():
     
     return render_template('unused.html', current_unused=current_unused, history=history)
 
-# 2. Update Unused Count (Restricted so Principal cannot submit/modify)
+
+# 2. Action Route to Add/Use Sheets
 @app.route('/update_unused', methods=['POST'])
 def update_unused():
-    if 'username' not in session:
+    is_logged_in = (current_user and current_user.is_authenticated) or ('username' in session) or ('user_id' in session)
+    
+    if not is_logged_in:
         return redirect(url_for('login'))
         
-    # Block principal from logging actions
-    if session.get('role') in ['principal', 'headmaster']:
+    # Get user role cleanly from current_user or session
+    user_role = getattr(current_user, 'role', session.get('role', ''))
+    if user_role in ['principal', 'headmaster']:
         flash("You have read-only access to loose sheets balance.", "danger")
         return redirect(url_for('unused_page'))
 
     action = request.form.get('action')
     sheets_count = int(request.form.get('sheets_count', 0))
-    notes = f"{session.get('username')} - {request.form.get('notes', '')}"
+    
+    # Get active username for logging
+    logged_user = getattr(current_user, 'username', session.get('username', 'System User'))
+    notes = f"{logged_user} - {request.form.get('notes', '')}"
 
     if sheets_count > 0:
         conn = get_db_connection()
